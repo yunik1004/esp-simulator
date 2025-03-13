@@ -8,9 +8,12 @@ authors = [
     { name = "yunik1004", email = "inkyuhak@gmail.com" },
 ]
 dependencies = [
+    "imageio[ffmpeg]>=2.37.0",
     "lightning>=2.5.0.post0",
     "minigrid>=3.0.0",
-    "moviepy>=2.1.2",
     "stable-baselines3>=2.5.0",
     "tensorboard>=2.19.0",
 ]
+
+[tool.setuptools]
+packages = ["esp_simulator"]

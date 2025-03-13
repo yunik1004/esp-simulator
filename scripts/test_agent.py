@@ -8,11 +8,11 @@ from lightning.fabric import Fabric
 from minigrid.manual_control import ManualControl
 import numpy as np
 from PIL import Image
-from stable_baselines3.common.vec_env import VecVideoRecorder
 
 from esp_simulator.environments.actions import ItemFarmActions
 from esp_simulator.policies.item_farm import ItemFarmPPO
 from esp_simulator.utils.vec_env import InferenceVecEnv
+from esp_simulator.utils.vec_wrapper import VecVideoRecorderWrapper
 
 from utils.environments import add_argument_environment, make_env
 
@@ -46,7 +46,7 @@ def main(args: argparse.Namespace) -> None:
     vec_env = InferenceVecEnv([lambda: env])
 
     if env.render_mode == "rgb_array":
-        vec_env = VecVideoRecorder(
+        vec_env = VecVideoRecorderWrapper(
             vec_env,
             video_folder=args.output_dir,
             record_video_trigger=lambda _: True,
