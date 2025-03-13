@@ -1,0 +1,16 @@
+[project]
+name = "esp-simulator"
+version = "0.1.0"
+description = "Simulate ESP"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "yunik1004", email = "inkyuhak@gmail.com" },
+]
+dependencies = [
+    "lightning>=2.5.0.post0",
+    "minigrid>=3.0.0",
+    "moviepy>=2.1.2",
+    "stable-baselines3>=2.5.0",
+    "tensorboard>=2.19.0",
+]
