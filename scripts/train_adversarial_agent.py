@@ -1,6 +1,7 @@
 """Train script"""
 
 import argparse
+import copy
 import os
 
 from lightning.fabric import Fabric
@@ -12,9 +13,9 @@ from stable_baselines3.common.callbacks import (
 from stable_baselines3.common.utils import get_latest_run_id
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
+from torch.optim import AdamW
 
 from esp_simulator.models.item_farm import ItemFarmAntiCheater
-from esp_simulator.policies.adversary import AdversarialLearner
 from esp_simulator.policies.item_farm import construct_ItemFarmPPO
 
 from utils.agents import add_argument_train_agent
@@ -51,22 +52,34 @@ def main(args: argparse.Namespace) -> None:
         device=fabric.device,
         adversary=True,
     )
+    if args.checkpoint != "":
+        model.set_parameters(args.checkpoint)
+
+    model_normal = None
+    if args.checkpoint_normal != "":
+        args_normal = copy.deepcopy(args)
+        args_normal.agent_view_size = args_normal.agent_view_size_normal
+        vec_env_normal = make_vec_env(
+            lambda: make_env(args_normal),
+            n_envs=args.num_processes,
+            seed=args.seed,
+            vec_env_cls=SubprocVecEnv,
+        )
+        model_normal = construct_ItemFarmPPO(
+            env=vec_env_normal,
+            device=fabric.device,
+        )
+        model_normal.set_parameters(args_normal.checkpoint_normal)
 
     classifier = ItemFarmAntiCheater(grid_size=args.grid_size)
-    # classifier.load_state_dict("")
+    if args.checkpoint_classifier != "":
+        classifier.load_state_dict(args.checkpoint_classifier)
     classifier.to(fabric.device)
-    classifier.eval()
-
-    adv_learner = AdversarialLearner(
-        agent=model,
-        classifier=classifier,
-        adv_coef=args.adv_coef,
-    )
 
     last_run_id = get_latest_run_id(log_path=args.log_dir, log_name=args.log_name)
     log_dir_actual = os.path.join(args.log_dir, f"{args.log_name}_{last_run_id + 1}")
 
-    adv_learner.learn(
+    model.adversarial_learn(
         total_timesteps=args.num_timesteps,
         callback=CallbackList(
             [
@@ -77,6 +90,10 @@ def main(args: argparse.Namespace) -> None:
             ]
         ),
         tb_log_name=args.log_name,
+        classifier=classifier,
+        adv_coef=args.adv_coef,
+        agent_normal=model_normal,
+        optimizer_classifier=AdamW(classifier.parameters(), lr=args.lr_classifier),
     )
 
     vec_env.close()
@@ -96,9 +113,36 @@ def get_args() -> argparse.Namespace:
     )
     parser.add_argument("--seed", type=int, default=0, help="random seed")
     add_argument_environment(parser)
+    parser.add_argument(
+        "--agent_view_size_normal",
+        type=int,
+        default=3,
+        help="view size of the normal agent. fully observable if < 0",
+    )
     add_argument_train_agent(parser)
     parser.add_argument(
-        "--adv_coef", type=float, default=0.01, help="adversarial training coefficient"
+        "--adv_coef", type=float, default=0.1, help="adversarial training coefficient"
+    )
+    parser.add_argument(
+        "--checkpoint", type=str, default="", help="checkpoint of the model"
+    )
+    parser.add_argument(
+        "--checkpoint_normal",
+        type=str,
+        default="",
+        help="checkpoint of the normal model",
+    )
+    parser.add_argument(
+        "--checkpoint_classifier",
+        type=str,
+        default="",
+        help="checkpoint of the classifier",
+    )
+    parser.add_argument(
+        "--lr_classifier",
+        type=float,
+        default=1e-4,
+        help="learning rate of the classifier",
     )
     return parser.parse_args()
 

@@ -5,6 +5,7 @@ import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.type_aliases import MaybeCallback
 from stable_baselines3.common.utils import obs_as_tensor, safe_mean
 from stable_baselines3.common.vec_env import VecEnv
 import torch as th
@@ -92,6 +93,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         n_rollout_steps: int,
         classifier: nn.Module,
         adv_coef: float,
+        train_classifier: bool,
     ) -> bool:
         """
         Collect experiences using the current policy and fill a ``RolloutBuffer``.
@@ -183,9 +185,12 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                     # Adversarial reward
                     map = infos[idx]["visual_status"]
                     map = th.tensor(map, device=self.device).unsqueeze(0).float()
-                    with th.no_grad():
-                        pred = th.sigmoid(classifier(map))[0]
-                    rewards[idx] -= adv_coef * pred
+                    if train_classifier:
+                        pred = th.sigmoid(classifier(map))
+                    else:
+                        with th.no_grad():
+                            pred = th.sigmoid(classifier(map))
+                    rewards[idx] -= adv_coef * pred.item()
                     self.ep_adv_buffer.extend([pred.item()])
 
             rollout_buffer.add(
@@ -210,6 +215,81 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         callback.on_rollout_end()
 
         return True
+
+    def adversarial_learn(
+        self,
+        total_timesteps: int,
+        callback: MaybeCallback = None,
+        log_interval: int = 1,
+        tb_log_name: str = "OnPolicyAlgorithm",
+        reset_num_timesteps: bool = True,
+        progress_bar: bool = False,
+        classifier: nn.Module | None = None,
+        adv_coef: float = 0.0,
+        agent_normal: PPO | None = None,
+        optimizer_classifier: th.optim.Optimizer | None = None,
+    ):
+        assert classifier is not None
+        train_classifier = optimizer_classifier is not None
+        if train_classifier:
+            assert agent_normal is not None
+            classifier.train()
+            criterion = nn.BCEWithLogitsLoss()
+        else:
+            classifier.eval()
+
+        iteration = 0
+
+        total_timesteps, callback = self._setup_learn(
+            total_timesteps,
+            callback,
+            reset_num_timesteps,
+            tb_log_name,
+            progress_bar,
+        )
+
+        callback.on_training_start(locals(), globals())
+
+        assert self.env is not None
+
+        while self.num_timesteps < total_timesteps:
+            if train_classifier:
+                optimizer_classifier.zero_grad()
+
+            continue_training = self.collect_rollouts(
+                self.env,
+                callback,
+                self.rollout_buffer,
+                n_rollout_steps=self.n_steps,
+                classifier=classifier,
+                adv_coef=adv_coef,
+                train_classifier=train_classifier,
+            )
+
+            if not continue_training:
+                break
+
+            iteration += 1
+            self._update_current_progress_remaining(self.num_timesteps, total_timesteps)
+
+            # Display training infos
+            if log_interval is not None and iteration % log_interval == 0:
+                assert self.ep_info_buffer is not None
+                self._dump_logs(iteration)
+
+            self.train()
+
+            if train_classifier:
+                # TODO: Predict via agent_normal
+                # rollout_buffer.get from agent, agent_normal
+                # loss = criterion(0, 0)
+                # loss.backward()
+                optimizer_classifier.step()
+                # Report
+
+        callback.on_training_end()
+
+        return self
 
 
 def construct_ItemFarmPPO(
