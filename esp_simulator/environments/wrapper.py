@@ -46,5 +46,5 @@ class VisualizeFinalStatusWrapper(Wrapper):
     def step(self, action):
         obs, reward, terminated, truncated, info = self.env.step(action)
         if terminated or truncated:
-            info["visual_status"] = self.env.visualize_status()["total"]
+            info["visual_status"] = self.env.unwrapped.visualize_status()["total"]
         return obs, reward, terminated, truncated, info

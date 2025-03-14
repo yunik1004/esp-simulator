@@ -10,9 +10,11 @@ class AdversarialLearner:
         self,
         agent: PPO,
         classifier: nn.Module,
+        adv_coef: float,
     ) -> None:
         self.agent = agent
         self.classifier = classifier
+        self.adv_coef = adv_coef
 
     def learn(
         self,
@@ -38,12 +40,13 @@ class AdversarialLearner:
         assert self.agent.env is not None
 
         while self.agent.num_timesteps < total_timesteps:
-            # # TODO: model.separate_learn() ???
             continue_training = self.agent.collect_rollouts(
                 self.agent.env,
                 callback,
                 self.agent.rollout_buffer,
                 n_rollout_steps=self.agent.n_steps,
+                classifier=self.classifier,
+                adv_coef=self.adv_coef,
             )
 
             if not continue_training:

@@ -13,6 +13,7 @@ from stable_baselines3.common.utils import get_latest_run_id
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
+from esp_simulator.models.item_farm import ItemFarmAntiCheater
 from esp_simulator.policies.adversary import AdversarialLearner
 from esp_simulator.policies.item_farm import construct_ItemFarmPPO
 
@@ -48,11 +49,18 @@ def main(args: argparse.Namespace) -> None:
         tensorboard_log=args.log_dir,
         verbose=1,
         device=fabric.device,
+        adversary=True,
     )
+
+    classifier = ItemFarmAntiCheater(grid_size=args.grid_size)
+    # classifier.load_state_dict("")
+    classifier.to(fabric.device)
+    classifier.eval()
 
     adv_learner = AdversarialLearner(
         agent=model,
-        classifier=None,  # TODO
+        classifier=classifier,
+        adv_coef=args.adv_coef,
     )
 
     last_run_id = get_latest_run_id(log_path=args.log_dir, log_name=args.log_name)
@@ -89,6 +97,9 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=0, help="random seed")
     add_argument_environment(parser)
     add_argument_train_agent(parser)
+    parser.add_argument(
+        "--adv_coef", type=float, default=0.01, help="adversarial training coefficient"
+    )
     return parser.parse_args()
 
 

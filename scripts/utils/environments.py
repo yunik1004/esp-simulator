@@ -3,7 +3,11 @@ import argparse
 import gymnasium as gym
 
 from esp_simulator.environments.item_farm import BaseItemFarmEnv
-from esp_simulator.environments.wrapper import ImgScaleWrapper, ObsSelectionWrapper
+from esp_simulator.environments.wrapper import (
+    ImgScaleWrapper,
+    ObsSelectionWrapper,
+    VisualizeFinalStatusWrapper,
+)
 
 
 def make_env(args: argparse.Namespace, **kwags) -> gym.Env:
@@ -30,6 +34,8 @@ def make_env(args: argparse.Namespace, **kwags) -> gym.Env:
     )
     env = ImgScaleWrapper(env)
     env = ObsSelectionWrapper(env, ["image", "item"])
+
+    env = VisualizeFinalStatusWrapper(env)
 
     return env
 
