@@ -15,6 +15,7 @@ from stable_baselines3.common.vec_env import SubprocVecEnv
 
 from esp_simulator.policies.item_farm import construct_ItemFarmPPO
 
+from utils.agents import add_argument_train_agent
 from utils.environments import add_argument_environment, make_env
 
 
@@ -79,37 +80,9 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--accelerator", type=str, default="auto", help="training accelerator"
     )
-    parser.add_argument(
-        "--log_dir", type=str, default="./output", help="tensorboard log dir"
-    )
-    parser.add_argument(
-        "--log_name", type=str, default="ESPSimul", help="tensorboard log name"
-    )
     parser.add_argument("--seed", type=int, default=0, help="random seed")
-    parser.add_argument("--lr", type=float, default=3e-4, help="learning rate")
-    parser.add_argument(
-        "--ent_coef", type=float, default=0.01, help="entropy coefficient"
-    )
-    parser.add_argument(
-        "--num_epochs", type=int, default=4, help="the number of epochs"
-    )
-    parser.add_argument(
-        "--num_processes",
-        type=int,
-        default=16,
-        help="the number of concurrent environments",
-    )
-    parser.add_argument(
-        "--num_timesteps", type=int, default=int(3e7), help="the number of timesteps"
-    )
-    parser.add_argument("--batch_size", type=int, default=512, help="batch size")
-    parser.add_argument(
-        "--checkpoint_freq",
-        type=int,
-        default=int(1e4),
-        help="checkpoint saving frequency",
-    )
     add_argument_environment(parser)
+    add_argument_train_agent(parser)
     return parser.parse_args()
 
 

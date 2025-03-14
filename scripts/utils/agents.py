@@ -1,0 +1,33 @@
+import argparse
+
+
+def add_argument_train_agent(parser: argparse.ArgumentParser):
+    parser.add_argument(
+        "--log_dir", type=str, default="./output", help="tensorboard log dir"
+    )
+    parser.add_argument(
+        "--log_name", type=str, default="ESPSimul", help="tensorboard log name"
+    )
+    parser.add_argument("--lr", type=float, default=3e-4, help="learning rate")
+    parser.add_argument(
+        "--ent_coef", type=float, default=0.01, help="entropy coefficient"
+    )
+    parser.add_argument(
+        "--num_epochs", type=int, default=4, help="the number of epochs"
+    )
+    parser.add_argument(
+        "--num_processes",
+        type=int,
+        default=16,
+        help="the number of concurrent environments",
+    )
+    parser.add_argument(
+        "--num_timesteps", type=int, default=int(3e7), help="the number of timesteps"
+    )
+    parser.add_argument("--batch_size", type=int, default=512, help="batch size")
+    parser.add_argument(
+        "--checkpoint_freq",
+        type=int,
+        default=int(1e4),
+        help="checkpoint saving frequency",
+    )

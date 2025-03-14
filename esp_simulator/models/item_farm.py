@@ -108,3 +108,38 @@ class ItemFarmMultiFeaturesExtractor(BaseFeaturesExtractor):
         for key, extractor in self.extractors.items():
             encoded_tensor_list.append(extractor(observations[key]))
         return torch.cat(encoded_tensor_list, dim=1)
+
+
+class ItemFarmAntiCheater(nn.Module):
+    def __init__(self, grid_size: int, features_dim: int = 64) -> None:
+        super().__init__()
+
+        n_input_channels = 2
+        input_size = (n_input_channels, grid_size, grid_size)
+
+        self.cnn = nn.Sequential(
+            nn.Conv2d(n_input_channels, 16, 2),
+            nn.ReLU(),
+            nn.Conv2d(16, 32, 2),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, 2),
+            nn.ReLU(),
+            nn.Flatten(),
+        )
+
+        # Compute shape by doing one forward pass
+        with torch.no_grad():
+            n_flatten = self.cnn(
+                torch.as_tensor(torch.randn(input_size)).unsqueeze(0).float()
+            ).shape[1]
+
+        self.mlp = nn.Sequential(
+            nn.Linear(n_flatten, features_dim),
+            nn.ReLU(),
+            nn.Linear(features_dim, features_dim),
+            nn.ReLU(),
+            nn.Linear(features_dim, 1),
+        )
+
+    def forward(self, map: torch.Tensor) -> torch.Tensor:
+        return self.mlp(self.cnn(map)).squeeze(1)
