@@ -7,12 +7,15 @@ import os
 from lightning.fabric import Fabric
 from lightning.pytorch import seed_everything
 from stable_baselines3.common.callbacks import (
+    BaseCallback,
     CallbackList,
     CheckpointCallback,
 )
 from stable_baselines3.common.utils import get_latest_run_id
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
+import torch
+from torch import nn
 from torch.optim import AdamW
 
 from esp_simulator.models.item_farm import ItemFarmAntiCheater
@@ -20,6 +23,39 @@ from esp_simulator.policies.item_farm import construct_ItemFarmPPO
 
 from utils.agents import add_argument_train_agent
 from utils.environments import add_argument_environment, make_env
+
+
+class ClassifierCheckpointCallback(BaseCallback):
+    def __init__(
+        self,
+        save_freq: int,
+        save_path: str,
+        classifier: nn.Module,
+        name_prefix: str = "classifier",
+        verbose: int = 0,
+    ):
+        super().__init__(verbose)
+        self.save_freq = save_freq
+        self.save_path = save_path
+        self.classifier = classifier
+        self.name_prefix = name_prefix
+
+    def _init_callback(self) -> None:
+        # Create folder if needed
+        if self.save_path is not None:
+            os.makedirs(self.save_path, exist_ok=True)
+
+    def _checkpoint_path(self, checkpoint_type: str = "", extension: str = "") -> str:
+        return os.path.join(
+            self.save_path,
+            f"{self.name_prefix}_{checkpoint_type}{self.num_timesteps}_steps.{extension}",
+        )
+
+    def _on_step(self) -> bool:
+        if self.n_calls % self.save_freq == 0:
+            model_path = self._checkpoint_path(extension="pt")
+            torch.save(self.classifier.state_dict(), model_path)
+        return True
 
 
 def main(args: argparse.Namespace) -> None:
@@ -92,6 +128,11 @@ def main(args: argparse.Namespace) -> None:
                 CheckpointCallback(
                     save_freq=args.checkpoint_freq,
                     save_path=log_dir_actual,
+                ),
+                ClassifierCheckpointCallback(
+                    save_freq=args.checkpoint_freq,
+                    save_path=log_dir_actual,
+                    classifier=classifier,
                 ),
             ]
         ),
