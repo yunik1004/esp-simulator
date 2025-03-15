@@ -1,4 +1,5 @@
 from collections import deque
+from typing import List
 
 from gymnasium import spaces
 import numpy as np
@@ -56,11 +57,92 @@ class ItemFarmPPO(PPO):
 
         super()._dump_logs(iteration)
 
+    def collect_visual_status(
+        self,
+        env: VecEnv,
+        batch_size: int,
+    ) -> List[th.Tensor]:
+        """
+        Collect visual status
+
+        :param env: The training environment
+        :param n_rollout_steps: Number of experiences to collect per environment
+        :return: True if function returned with at least `n_rollout_steps`
+            collected, False if callback terminated rollout prematurely.
+        """
+        assert self._last_obs is not None, "No previous observation was provided"
+        # Switch to eval mode (this affects batch norm / dropout)
+        self.policy.set_training_mode(False)
+
+        output_buffer = []
+
+        n_steps = 0
+        # Sample new weights for the state dependent exploration
+        if self.use_sde:
+            self.policy.reset_noise(env.num_envs)
+
+        while len(output_buffer) < batch_size:
+            if (
+                self.use_sde
+                and self.sde_sample_freq > 0
+                and n_steps % self.sde_sample_freq == 0
+            ):
+                # Sample a new noise matrix
+                self.policy.reset_noise(env.num_envs)
+
+            with th.no_grad():
+                # Convert to pytorch tensor or to TensorDict
+                obs_tensor = obs_as_tensor(self._last_obs, self.device)
+                actions, values, log_probs = self.policy(obs_tensor)
+            actions = actions.cpu().numpy()
+
+            # Rescale and perform action
+            clipped_actions = actions
+
+            if isinstance(self.action_space, spaces.Box):
+                if self.policy.squash_output:
+                    # Unscale the actions to match env bounds
+                    # if they were previously squashed (scaled in [-1, 1])
+                    clipped_actions = self.policy.unscale_action(clipped_actions)
+                else:
+                    # Otherwise, clip the actions to avoid out of bound error
+                    # as we are sampling from an unbounded Gaussian distribution
+                    clipped_actions = np.clip(
+                        actions, self.action_space.low, self.action_space.high
+                    )
+
+            new_obs, rewards, dones, infos = env.step(clipped_actions)
+
+            self.num_timesteps += env.num_envs
+
+            self._update_info_buffer(infos, dones)
+            n_steps += 1
+
+            if isinstance(self.action_space, spaces.Discrete):
+                # Reshape in case of discrete action
+                actions = actions.reshape(-1, 1)
+
+            # Handle timeout by bootstrapping with value function
+            # see GitHub issue #633
+            for idx, done in enumerate(dones):
+                if done:
+                    map = infos[idx]["visual_status"]
+                    map = th.tensor(map, device=self.device).float()
+                    output_buffer.append(map)
+
+            self._last_obs = new_obs  # type: ignore[assignment]
+            self._last_episode_starts = dones
+
+        output_tensor = th.stack(output_buffer[:batch_size], dim=0)
+
+        return output_tensor
+
 
 class ItemFarmAdversarialPPO(ItemFarmPPO):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ep_adv_buffer = None
+        self.ep_cls_buffer = None
 
     def _setup_learn(
         self,
@@ -73,19 +155,30 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         if self.ep_adv_buffer is None or reset_num_timesteps:
             self.ep_adv_buffer = deque(maxlen=self._stats_window_size)
 
+        if self.ep_cls_buffer is None or reset_num_timesteps:
+            self.ep_cls_buffer = deque(maxlen=self._stats_window_size)
+
         return super()._setup_learn(
             total_timesteps, callback, reset_num_timesteps, tb_log_name, ç
         )
 
     def _dump_logs(self, iteration):
         assert self.ep_adv_buffer is not None
+        assert self.ep_cls_buffer is not None
 
         if len(self.ep_adv_buffer) > 0:
-            self.logger.record("rollout/ep_adv_mean", safe_mean(self.ep_adv_buffer))
+            self.logger.record(
+                "adversary/pred_cheater_mean", safe_mean(self.ep_adv_buffer)
+            )
+
+        if len(self.ep_cls_buffer) > 0:
+            self.logger.record(
+                "adversary/loss_classifier_mean", safe_mean(self.ep_cls_buffer)
+            )
 
         super()._dump_logs(iteration)
 
-    def collect_rollouts(
+    def collect_adversarial_rollouts(
         self,
         env: VecEnv,
         callback: BaseCallback,
@@ -94,7 +187,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         classifier: nn.Module,
         adv_coef: float,
         train_classifier: bool,
-    ) -> bool:
+    ) -> th.Tensor | None:
         """
         Collect experiences using the current policy and fill a ``RolloutBuffer``.
         The term rollout here refers to the model-free notion and should not
@@ -111,6 +204,8 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         assert self._last_obs is not None, "No previous observation was provided"
         # Switch to eval mode (this affects batch norm / dropout)
         self.policy.set_training_mode(False)
+
+        pred_buffer = []
 
         n_steps = 0
         rollout_buffer.reset()
@@ -157,7 +252,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
             # Give access to local variables
             callback.update_locals(locals())
             if not callback.on_step():
-                return False
+                return None
 
             self._update_info_buffer(infos, dones)
             n_steps += 1
@@ -184,9 +279,10 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                 if done:
                     # Adversarial reward
                     map = infos[idx]["visual_status"]
-                    map = th.tensor(map, device=self.device).unsqueeze(0).float()
+                    map = th.tensor(map, device=self.device).float().unsqueeze(0)
                     if train_classifier:
                         pred = th.sigmoid(classifier(map))
+                        pred_buffer.append(pred)
                     else:
                         with th.no_grad():
                             pred = th.sigmoid(classifier(map))
@@ -214,7 +310,9 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
 
         callback.on_rollout_end()
 
-        return True
+        pred_tensor = th.concat(pred_buffer, dim=0)
+
+        return pred_tensor
 
     def adversarial_learn(
         self,
@@ -235,6 +333,14 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
             assert agent_normal is not None
             classifier.train()
             criterion = nn.BCEWithLogitsLoss()
+
+            agent_normal._setup_learn(
+                total_timesteps,
+                None,
+                reset_num_timesteps,
+                f"{tb_log_name}_normal",
+                False,
+            )
         else:
             classifier.eval()
 
@@ -256,7 +362,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
             if train_classifier:
                 optimizer_classifier.zero_grad()
 
-            continue_training = self.collect_rollouts(
+            pred_cheater = self.collect_adversarial_rollouts(
                 self.env,
                 callback,
                 self.rollout_buffer,
@@ -266,7 +372,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                 train_classifier=train_classifier,
             )
 
-            if not continue_training:
+            if pred_cheater is None:
                 break
 
             iteration += 1
@@ -280,12 +386,28 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
             self.train()
 
             if train_classifier:
-                # TODO: Predict via agent_normal
-                # rollout_buffer.get from agent, agent_normal
-                # loss = criterion(0, 0)
-                # loss.backward()
+                batch_size = pred_cheater.shape[0]
+
+                vis_normal = agent_normal.collect_visual_status(
+                    env=agent_normal.env,
+                    batch_size=batch_size,
+                )
+                pred_normal = th.sigmoid(classifier(vis_normal))
+
+                pred = th.concat([pred_cheater, pred_normal], dim=0)
+                target = th.concat(
+                    [th.ones_like(pred_cheater), th.zeros_like(pred_normal)], dim=0
+                )
+
+                loss = criterion(pred, target)
+                loss.backward()
+
                 optimizer_classifier.step()
-                # Report
+
+                # Logging loss
+                self.ep_cls_buffer.extend([loss.item()])
+
+                # TODO: Save classifier
 
         callback.on_training_end()
 

@@ -76,6 +76,12 @@ def main(args: argparse.Namespace) -> None:
         classifier.load_state_dict(args.checkpoint_classifier)
     classifier.to(fabric.device)
 
+    optimizer_classifier = (
+        AdamW(classifier.parameters(), lr=args.lr_classifier)
+        if model_normal is not None
+        else None
+    )
+
     last_run_id = get_latest_run_id(log_path=args.log_dir, log_name=args.log_name)
     log_dir_actual = os.path.join(args.log_dir, f"{args.log_name}_{last_run_id + 1}")
 
@@ -93,7 +99,7 @@ def main(args: argparse.Namespace) -> None:
         classifier=classifier,
         adv_coef=args.adv_coef,
         agent_normal=model_normal,
-        optimizer_classifier=AdamW(classifier.parameters(), lr=args.lr_classifier),
+        optimizer_classifier=optimizer_classifier,
     )
 
     vec_env.close()
