@@ -22,7 +22,7 @@ def add_argument_train_agent(parser: argparse.ArgumentParser):
         help="the number of concurrent environments",
     )
     parser.add_argument(
-        "--num_timesteps", type=int, default=int(3e7), help="the number of timesteps"
+        "--num_timesteps", type=int, default=int(1e8), help="the number of timesteps"
     )
     parser.add_argument("--batch_size", type=int, default=512, help="batch size")
     parser.add_argument(
