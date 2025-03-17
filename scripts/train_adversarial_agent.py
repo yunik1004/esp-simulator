@@ -91,20 +91,19 @@ def main(args: argparse.Namespace) -> None:
     if args.checkpoint != "":
         model.set_parameters(args.checkpoint)
 
-    model_normal = None
+    args_normal = copy.deepcopy(args)
+    args_normal.agent_view_size = args_normal.agent_view_size_normal
+    vec_env_normal = make_vec_env(
+        lambda: make_env(args_normal),
+        n_envs=args.num_processes,
+        seed=args.seed,
+        vec_env_cls=SubprocVecEnv,
+    )
+    model_normal = construct_ItemFarmPPO(
+        env=vec_env_normal,
+        device=fabric.device,
+    )
     if args.checkpoint_normal != "":
-        args_normal = copy.deepcopy(args)
-        args_normal.agent_view_size = args_normal.agent_view_size_normal
-        vec_env_normal = make_vec_env(
-            lambda: make_env(args_normal),
-            n_envs=args.num_processes,
-            seed=args.seed,
-            vec_env_cls=SubprocVecEnv,
-        )
-        model_normal = construct_ItemFarmPPO(
-            env=vec_env_normal,
-            device=fabric.device,
-        )
         model_normal.set_parameters(args_normal.checkpoint_normal)
 
     classifier = ItemFarmAntiCheater(grid_size=args.grid_size)

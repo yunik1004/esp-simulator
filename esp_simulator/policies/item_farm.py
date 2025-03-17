@@ -201,8 +201,9 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         n_rollout_steps: int,
         classifier: nn.Module,
         adv_coef: float,
+        agent_normal: PPO,
         train_classifier: bool,
-    ) -> th.Tensor | None:
+    ) -> tuple[bool, tuple[th.Tensor, th.Tensor]]:
         """
         Collect experiences using the current policy and fill a ``RolloutBuffer``.
         The term rollout here refers to the model-free notion and should not
@@ -267,7 +268,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
             # Give access to local variables
             callback.update_locals(locals())
             if not callback.on_step():
-                return False
+                return False, (None, None)
 
             self._update_info_buffer(infos, dones)
             n_steps += 1
@@ -315,6 +316,16 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
             self._last_obs = new_obs  # type: ignore[assignment]
             self._last_episode_starts = dones
 
+        # Normal input prediction
+        pred_cheater = th.concat(pred_buffer, dim=0)
+
+        batch_size = pred_cheater.shape[0]
+        vis_normal = agent_normal.collect_visual_status(
+            env=agent_normal.env,
+            batch_size=batch_size,
+        )
+        pred_normal = th.sigmoid(classifier(vis_normal))
+
         with th.no_grad():
             # Compute value for the last timestep
             values = self.policy.predict_values(obs_as_tensor(new_obs, self.device))  # type: ignore[arg-type]
@@ -325,8 +336,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
 
         callback.on_rollout_end()
 
-        pred_tensor = th.concat(pred_buffer, dim=0)
-        return pred_tensor
+        return True, (pred_cheater, pred_normal)
 
     def adversarial_learn(
         self,
@@ -342,22 +352,21 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         optimizer_classifier: th.optim.Optimizer | None = None,
     ):
         assert classifier is not None
+        assert agent_normal is not None
         train_classifier = optimizer_classifier is not None
         if train_classifier:
-            assert agent_normal is not None
             classifier.train()
             criterion = nn.BCELoss()
         else:
             classifier.eval()
 
-        if agent_normal is not None:
-            agent_normal._setup_learn(
-                total_timesteps,
-                None,
-                reset_num_timesteps,
-                f"{tb_log_name}_normal",
-                False,
-            )
+        agent_normal._setup_learn(
+            total_timesteps,
+            None,
+            reset_num_timesteps,
+            f"{tb_log_name}_normal",
+            False,
+        )
 
         iteration = 0
 
@@ -377,18 +386,24 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
             if train_classifier:
                 optimizer_classifier.zero_grad()
 
-            pred_cheater = self.collect_adversarial_rollouts(
-                self.env,
-                callback,
-                self.rollout_buffer,
-                n_rollout_steps=self.n_steps,
-                classifier=classifier,
-                adv_coef=adv_coef,
-                train_classifier=train_classifier,
+            continue_training, (pred_cheater, pred_normal) = (
+                self.collect_adversarial_rollouts(
+                    self.env,
+                    callback,
+                    self.rollout_buffer,
+                    n_rollout_steps=self.n_steps,
+                    classifier=classifier,
+                    adv_coef=adv_coef,
+                    agent_normal=agent_normal,
+                    train_classifier=train_classifier,
+                )
             )
 
-            if pred_cheater is None:
+            if not continue_training:
                 break
+
+            assert pred_cheater is not None
+            assert pred_normal is not None
 
             iteration += 1
             self._update_current_progress_remaining(self.num_timesteps, total_timesteps)
@@ -400,40 +415,32 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
 
             self.train()
 
-            if agent_normal is not None:
-                batch_size = pred_cheater.shape[0]
+            # Compute AUROC and AP
+            pred = th.concat([pred_cheater, pred_normal], dim=0)
+            target = th.concat(
+                [
+                    th.ones_like(pred_cheater, dtype=th.long),
+                    th.zeros_like(pred_normal, dtype=th.long),
+                ],
+                dim=0,
+            )
 
-                vis_normal = agent_normal.collect_visual_status(
-                    env=agent_normal.env,
-                    batch_size=batch_size,
-                )
-                pred_normal = th.sigmoid(classifier(vis_normal))
+            auroc_func = AUROC(task="binary")
+            auroc = auroc_func(pred, target)
+            self.ep_auroc_buffer.extend([auroc.item()])
 
-                pred = th.concat([pred_cheater, pred_normal], dim=0)
-                target = th.concat(
-                    [
-                        th.ones_like(pred_cheater, dtype=th.long),
-                        th.zeros_like(pred_normal, dtype=th.long),
-                    ],
-                    dim=0,
-                )
+            ap_func = AveragePrecision(task="binary")
+            ap = ap_func(pred, target)
+            self.ep_ap_buffer.extend([ap.item()])
 
-                auroc_func = AUROC(task="binary")
-                auroc = auroc_func(pred, target)
-                self.ep_auroc_buffer.extend([auroc.item()])
+            if train_classifier:
+                loss = criterion(pred, target.float())
+                loss.backward()
 
-                ap_func = AveragePrecision(task="binary")
-                ap = ap_func(pred, target)
-                self.ep_ap_buffer.extend([ap.item()])
+                optimizer_classifier.step()
 
-                if train_classifier:
-                    loss = criterion(pred, target.float())
-                    loss.backward()
-
-                    optimizer_classifier.step()
-
-                    # Logging loss
-                    self.ep_cls_buffer.extend([loss.item()])
+                # Logging loss
+                self.ep_cls_buffer.extend([loss.item()])
 
         callback.on_training_end()
 
