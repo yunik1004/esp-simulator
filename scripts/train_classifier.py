@@ -9,7 +9,6 @@ from lightning.pytorch.loggers import TensorBoardLogger
 import torch
 from torch import nn
 from torch.optim import AdamW
-from torch.optim.swa_utils import AveragedModel, get_ema_multi_avg_fn, update_bn
 from torch.utils.data import DataLoader
 
 from esp_simulator.data.item_farm import ItemFarmClassificationDataset
@@ -24,20 +23,8 @@ class TrainerModel(L.LightningModule):
     def __init__(self, hparams: argparse.Namespace):
         super().__init__()
         self.save_hyperparameters(hparams)
-
         self.model = ItemFarmAntiCheater(grid_size=self.hparams.grid_size)
-        if self.hparams.ema:
-            self.init_ema()
-
         self.criterion = nn.BCEWithLogitsLoss()
-
-    def init_ema(self) -> None:
-        """Initialize the ema model"""
-        self.ema_model = AveragedModel(
-            self.model, multi_avg_fn=get_ema_multi_avg_fn(self.hparams.ema_decay)
-        )
-        for param in self.ema_model.parameters():
-            param.requires_grad = False
 
     def load_checkpoint(self, checkpoint_path: str) -> None:
         """Load model weight from the checkpoint
@@ -48,36 +35,23 @@ class TrainerModel(L.LightningModule):
             Path to checkpoint
         """
         checkpoint = torch.load(checkpoint_path)["state_dict"]
-        self.load_state_dict(checkpoint, strict=False)
-        if self.hparams.ema:
-            ema_model_exist = False
-            for k in checkpoint.keys():
-                if k.startswith("ema_model."):
-                    ema_model_exist = True
-                    break
-            if not ema_model_exist:
-                self.init_ema()
+        self.model.load_state_dict(checkpoint, strict=False)
+
+    def on_save_checkpoint(self, checkpoint):
+        checkpoint["state_dict"] = self.model.state_dict()
 
     def training_step(self, batch, batch_idx):
         x = batch["data"]
         y = batch["label"]
-        y_hat = self.ema_model(x) if self.hparams.ema else self.model(x)
+        y_hat = self.model(x)
         loss = self.criterion(y_hat, y.float())
         self.log_dict({"train/loss": loss})
         return {"loss": loss}
 
-    def on_train_batch_end(self, outputs, batch, batch_idx):
-        if self.hparams.ema:
-            self.ema_model.update_parameters(self.model)
-
-    def on_train_epoch_end(self):
-        if self.hparams.ema:
-            update_bn(self.trainer.train_dataloader, self.ema_model)
-
     def validation_step(self, batch, batch_idx):
         x = batch["data"]
         y = batch["label"]
-        y_hat = self.ema_model(x) if self.hparams.ema else self.model(x)
+        y_hat = self.model(x)
         loss = self.criterion(y_hat, y.float())
         self.log_dict({"val/loss": loss}, on_epoch=True, sync_dist=True)
         return {"loss": loss}
@@ -196,8 +170,6 @@ def get_args() -> argparse.Namespace:
     )
     parser.add_argument("--seed", type=int, default=0, help="random seed")
     parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
-    parser.add_argument("--ema", action="store_true", help="perform EMA")
-    parser.add_argument("--ema_decay", type=float, default=0.999, help="learning rate")
     parser.add_argument(
         "--max_epochs", type=int, default=100, help="maximum number of epochs"
     )

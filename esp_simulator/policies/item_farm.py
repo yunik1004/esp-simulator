@@ -11,6 +11,7 @@ from stable_baselines3.common.utils import obs_as_tensor, safe_mean
 from stable_baselines3.common.vec_env import VecEnv
 import torch as th
 from torch import nn
+from torchmetrics import AUROC, AveragePrecision
 
 from ..models.item_farm import ItemFarmMultiFeaturesExtractor
 
@@ -143,6 +144,8 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         super().__init__(*args, **kwargs)
         self.ep_adv_buffer = None
         self.ep_cls_buffer = None
+        self.ep_auroc_buffer = None
+        self.ep_ap_buffer = None
 
     def _setup_learn(
         self,
@@ -154,9 +157,12 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
     ):
         if self.ep_adv_buffer is None or reset_num_timesteps:
             self.ep_adv_buffer = deque(maxlen=self._stats_window_size)
-
         if self.ep_cls_buffer is None or reset_num_timesteps:
             self.ep_cls_buffer = deque(maxlen=self._stats_window_size)
+        if self.ep_auroc_buffer is None or reset_num_timesteps:
+            self.ep_auroc_buffer = deque(maxlen=self._stats_window_size)
+        if self.ep_ap_buffer is None or reset_num_timesteps:
+            self.ep_ap_buffer = deque(maxlen=self._stats_window_size)
 
         return super()._setup_learn(
             total_timesteps, callback, reset_num_timesteps, tb_log_name, ç
@@ -165,15 +171,24 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
     def _dump_logs(self, iteration):
         assert self.ep_adv_buffer is not None
         assert self.ep_cls_buffer is not None
+        assert self.ep_auroc_buffer is not None
+        assert self.ep_ap_buffer is not None
 
         if len(self.ep_adv_buffer) > 0:
             self.logger.record(
                 "adversary/pred_cheater_mean", safe_mean(self.ep_adv_buffer)
             )
-
         if len(self.ep_cls_buffer) > 0:
             self.logger.record(
                 "adversary/loss_classifier_mean", safe_mean(self.ep_cls_buffer)
+            )
+        if len(self.ep_auroc_buffer) > 0:
+            self.logger.record(
+                "adversary/auroc_classifier_mean", safe_mean(self.ep_auroc_buffer)
+            )
+        if len(self.ep_ap_buffer) > 0:
+            self.logger.record(
+                "adversary/ap_classifier_mean", safe_mean(self.ep_ap_buffer)
             )
 
         super()._dump_logs(iteration)
@@ -252,7 +267,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
             # Give access to local variables
             callback.update_locals(locals())
             if not callback.on_step():
-                return None
+                return False
 
             self._update_info_buffer(infos, dones)
             n_steps += 1
@@ -282,10 +297,10 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                     map = th.tensor(map, device=self.device).float().unsqueeze(0)
                     if train_classifier:
                         pred = th.sigmoid(classifier(map))
-                        pred_buffer.append(pred)
                     else:
                         with th.no_grad():
                             pred = th.sigmoid(classifier(map))
+                    pred_buffer.append(pred)
                     rewards[idx] -= adv_coef * pred.item()
                     self.ep_adv_buffer.extend([pred.item()])
 
@@ -311,7 +326,6 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         callback.on_rollout_end()
 
         pred_tensor = th.concat(pred_buffer, dim=0)
-
         return pred_tensor
 
     def adversarial_learn(
@@ -332,8 +346,11 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         if train_classifier:
             assert agent_normal is not None
             classifier.train()
-            criterion = nn.BCEWithLogitsLoss()
+            criterion = nn.BCELoss()
+        else:
+            classifier.eval()
 
+        if agent_normal is not None:
             agent_normal._setup_learn(
                 total_timesteps,
                 None,
@@ -341,8 +358,6 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                 f"{tb_log_name}_normal",
                 False,
             )
-        else:
-            classifier.eval()
 
         iteration = 0
 
@@ -385,7 +400,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
 
             self.train()
 
-            if train_classifier:
+            if agent_normal is not None:
                 batch_size = pred_cheater.shape[0]
 
                 vis_normal = agent_normal.collect_visual_status(
@@ -396,18 +411,29 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
 
                 pred = th.concat([pred_cheater, pred_normal], dim=0)
                 target = th.concat(
-                    [th.ones_like(pred_cheater), th.zeros_like(pred_normal)], dim=0
+                    [
+                        th.ones_like(pred_cheater, dtype=th.long),
+                        th.zeros_like(pred_normal, dtype=th.long),
+                    ],
+                    dim=0,
                 )
 
-                loss = criterion(pred, target)
-                loss.backward()
+                auroc_func = AUROC(task="binary")
+                auroc = auroc_func(pred, target)
+                self.ep_auroc_buffer.extend([auroc.item()])
 
-                optimizer_classifier.step()
+                ap_func = AveragePrecision(task="binary")
+                ap = ap_func(pred, target)
+                self.ep_ap_buffer.extend([ap.item()])
 
-                # Logging loss
-                self.ep_cls_buffer.extend([loss.item()])
+                if train_classifier:
+                    loss = criterion(pred, target.float())
+                    loss.backward()
 
-                # TODO: Save classifier
+                    optimizer_classifier.step()
+
+                    # Logging loss
+                    self.ep_cls_buffer.extend([loss.item()])
 
         callback.on_training_end()
 

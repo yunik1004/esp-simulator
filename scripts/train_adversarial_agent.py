@@ -109,33 +109,37 @@ def main(args: argparse.Namespace) -> None:
 
     classifier = ItemFarmAntiCheater(grid_size=args.grid_size)
     if args.checkpoint_classifier != "":
-        classifier.load_state_dict(args.checkpoint_classifier)
+        checkpoint = torch.load(args.checkpoint_classifier)["state_dict"]
+        classifier.load_state_dict(checkpoint)
     classifier.to(fabric.device)
 
     optimizer_classifier = (
         AdamW(classifier.parameters(), lr=args.lr_classifier)
-        if model_normal is not None
+        if args.train_classifier
         else None
     )
 
     last_run_id = get_latest_run_id(log_path=args.log_dir, log_name=args.log_name)
     log_dir_actual = os.path.join(args.log_dir, f"{args.log_name}_{last_run_id + 1}")
 
+    callbacks = [
+        CheckpointCallback(
+            save_freq=args.checkpoint_freq,
+            save_path=log_dir_actual,
+        ),
+    ]
+    if args.train_classifier:
+        callbacks.append(
+            ClassifierCheckpointCallback(
+                save_freq=args.checkpoint_freq,
+                save_path=log_dir_actual,
+                classifier=classifier,
+            )
+        )
+
     model.adversarial_learn(
         total_timesteps=args.num_timesteps,
-        callback=CallbackList(
-            [
-                CheckpointCallback(
-                    save_freq=args.checkpoint_freq,
-                    save_path=log_dir_actual,
-                ),
-                ClassifierCheckpointCallback(
-                    save_freq=args.checkpoint_freq,
-                    save_path=log_dir_actual,
-                    classifier=classifier,
-                ),
-            ]
-        ),
+        callback=CallbackList(callbacks),
         tb_log_name=args.log_name,
         classifier=classifier,
         adv_coef=args.adv_coef,
@@ -168,7 +172,7 @@ def get_args() -> argparse.Namespace:
     )
     add_argument_train_agent(parser)
     parser.add_argument(
-        "--adv_coef", type=float, default=0.1, help="adversarial training coefficient"
+        "--adv_coef", type=float, default=1.0, help="adversarial training coefficient"
     )
     parser.add_argument(
         "--checkpoint", type=str, default="", help="checkpoint of the model"
@@ -190,6 +194,11 @@ def get_args() -> argparse.Namespace:
         type=float,
         default=1e-4,
         help="learning rate of the classifier",
+    )
+    parser.add_argument(
+        "--train_classifier",
+        action="store_true",
+        help="train the classifier",
     )
     return parser.parse_args()
 

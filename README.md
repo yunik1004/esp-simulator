@@ -107,14 +107,11 @@ python scripts/evaluate_classifier.py \
 ## 4. Train adversarial agent
 
 ```bash
-# Train agent only
-python scripts/train_adversarial_agent.py --agent_view_size -1 \
-        --checkpoint CHECKPOINT_CHEATER_PATH \
-        --checkpoint_classifier CHECKPOINT_CLASSIFIER_PATH
-
-# Train both agent and classifier
+# Train agent and classifier.
+# Remove `--train_classifier` if you don't want to train the classifier.
 python scripts/train_adversarial_agent.py --agent_view_size -1 \
         --checkpoint CHECKPOINT_CHEATER_PATH \
         --checkpoint_normal CHECKPOINT_NORMAL_PATH \
-        --checkpoint_classifier CHECKPOINT_CLASSIFIER_PATH
+        --checkpoint_classifier CHECKPOINT_CLASSIFIER_PATH \
+        --train_classifier
 ```

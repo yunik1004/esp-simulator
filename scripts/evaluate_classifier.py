@@ -36,7 +36,7 @@ class TesterModel(L.LightningModule):
             Path to checkpoint
         """
         checkpoint = torch.load(checkpoint_path)["state_dict"]
-        self.load_state_dict(checkpoint, strict=False)
+        self.model.load_state_dict(checkpoint, strict=False)
 
     def test_step(self, batch, batch_idx):
         x = batch["data"]
@@ -83,17 +83,7 @@ class TesterModel(L.LightningModule):
             # Precision-Recall
             precision, recall, thresholds_pr = self.pr_curve.compute()
 
-            min_prec1_idx = torch.where(precision >= 1 - 1e-7)[0][0]
-            recall_prec1 = recall[min_prec1_idx]
-            threshold_prec1 = (
-                0
-                if min_prec1_idx == len(precision) - 1
-                else thresholds_pr[min_prec1_idx]
-            )
             ap = -torch.trapz(precision, recall)
-
-            self.log_dict({"test/precision=1.0/recall(tpr)": recall_prec1})
-            self.log_dict({"test/precision=1.0/threshold": threshold_prec1})
             self.log_dict({"test/AP": ap})
 
             precision_random = precision[0]
@@ -104,7 +94,6 @@ class TesterModel(L.LightningModule):
                 [precision_random.cpu(), precision_random.cpu()],
                 linestyle="dashed",
             )
-            ax_pr.plot(recall_prec1.cpu(), 1, "o", color="k")
             ax_pr.dataLim.y0 = 0
             ax_pr.dataLim.y1 = 1
             ax_pr.autoscale_view()
@@ -239,7 +228,7 @@ def get_args() -> argparse.Namespace:
         help="name of the ROC curve image",
     )
     parser.add_argument(
-        "--output_confmat_image_",
+        "--output_confmat_image",
         type=str,
         default="./output/confmat.png",
         help="name of the confusion matrix image",
