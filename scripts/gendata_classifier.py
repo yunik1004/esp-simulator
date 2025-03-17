@@ -100,7 +100,10 @@ def get_args() -> argparse.Namespace:
         "--checkpoint", type=str, default="", help="checkpoint of the model"
     )
     parser.add_argument(
-        "--output_path", type=str, default="output.npy", help="output data path"
+        "--output_path",
+        type=str,
+        default="./output/output.npy",
+        help="output data path",
     )
     parser.add_argument(
         "--seed_envs",

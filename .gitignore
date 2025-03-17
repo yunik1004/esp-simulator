@@ -190,4 +190,5 @@ Temporary Items
 .apdisk
 
 # Output
+lightning_logs/
 output/

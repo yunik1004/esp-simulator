@@ -154,9 +154,9 @@ class TesterModel(L.LightningModule):
                 output_conf_path = self.hparams.output_confmat_image
                 fig_conf.savefig(output_conf_path)
 
-            # Print false positive, false negative
-            print(f"False Positives: {self.fp}")
-            print(f"False Negatives: {self.fn}")
+                # Print false positive, false negative
+                print(f"False Positives: {self.fp}")
+                print(f"False Negatives: {self.fn}")
 
 
 class TesterDataModule(L.LightningDataModule):
