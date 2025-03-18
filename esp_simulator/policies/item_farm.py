@@ -297,12 +297,13 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                     map = infos[idx]["visual_status"]
                     map = th.tensor(map, device=self.device).float().unsqueeze(0)
                     if train_classifier:
-                        pred = th.sigmoid(classifier(map))
+                        logit = classifier(map)
                     else:
                         with th.no_grad():
-                            pred = th.sigmoid(classifier(map))
-                    pred_buffer.append(pred)
-                    rewards[idx] -= adv_coef * pred.item()
+                            logit = classifier(map)
+                    pred = th.sigmoid(logit)
+                    pred_buffer.append(logit)
+                    rewards[idx] -= adv_coef * logit.item()
                     self.ep_adv_buffer.extend([pred.item()])
 
             rollout_buffer.add(
@@ -324,7 +325,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
             env=agent_normal.env,
             batch_size=batch_size,
         )
-        pred_normal = th.sigmoid(classifier(vis_normal))
+        pred_normal = classifier(vis_normal)
 
         with th.no_grad():
             # Compute value for the last timestep
@@ -356,7 +357,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         train_classifier = optimizer_classifier is not None
         if train_classifier:
             classifier.train()
-            criterion = nn.BCELoss()
+            criterion = nn.BCEWithLogitsLoss()
         else:
             classifier.eval()
 

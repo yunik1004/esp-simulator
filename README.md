@@ -113,5 +113,6 @@ python scripts/train_adversarial_agent.py --agent_view_size -1 \
         --checkpoint CHECKPOINT_CHEATER_PATH \
         --checkpoint_normal CHECKPOINT_NORMAL_PATH \
         --checkpoint_classifier CHECKPOINT_CLASSIFIER_PATH \
+        --adv_coef 0.1 \
         --train_classifier
 ```

@@ -171,7 +171,7 @@ def get_args() -> argparse.Namespace:
     )
     add_argument_train_agent(parser)
     parser.add_argument(
-        "--adv_coef", type=float, default=1.0, help="adversarial training coefficient"
+        "--adv_coef", type=float, default=0.1, help="adversarial training coefficient"
     )
     parser.add_argument(
         "--checkpoint", type=str, default="", help="checkpoint of the model"
