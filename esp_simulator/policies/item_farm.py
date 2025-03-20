@@ -141,8 +141,9 @@ class ItemFarmPPO(PPO):
 
 
 class ItemFarmAdversarialPPO(ItemFarmPPO):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, adv_coef: float = 0.0, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.adv_coef = adv_coef
         self.ep_adv_buffer = None
         self.ep_cls_buffer = None
         self.ep_auroc_buffer = None
@@ -201,7 +202,6 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         rollout_buffer: RolloutBuffer,
         n_rollout_steps: int,
         classifier: nn.Module,
-        adv_coef: float,
         agent_normal: PPO,
         train_classifier: bool,
     ) -> tuple[bool, tuple[th.Tensor, th.Tensor]]:
@@ -306,8 +306,8 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                     pred_buffer.append(logit)
 
                     # num_timestep = infos[idx]["episode"]["l"]
-                    # rewards[idx] += adv_coef * np.exp(self.gamma, -num_timestep) * np.log(1 + np.exp(-logit.item()))
-                    rewards[idx] -= adv_coef * logit.item()
+                    # rewards[idx] += self.adv_coef * np.exp(self.gamma, -num_timestep) * np.log(1 + np.exp(-logit.item()))
+                    rewards[idx] -= self.adv_coef * logit.item()
 
                     self.ep_adv_buffer.extend([pred.item()])
 
@@ -351,7 +351,6 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         rollout_buffer: RolloutBuffer,
         n_rollout_steps: int,
         classifier: nn.Module,
-        adv_coef: float,
         agent_normal: PPO,
         train_classifier: bool,
     ) -> tuple[bool, tuple[th.Tensor, th.Tensor]]:
@@ -633,10 +632,9 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         reset_num_timesteps: bool = True,
         progress_bar: bool = False,
         classifier: nn.Module | None = None,
-        adv_coef: float = 0.0,
         agent_normal: PPO | None = None,
         optimizer_classifier: th.optim.Optimizer | None = None,
-        method: str = "policy_gradient",  # reward_shaping, policy_gradient
+        method: str = "reward_shaping",  # reward_shaping, policy_gradient
     ):
         assert classifier is not None
         assert agent_normal is not None
@@ -690,7 +688,6 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                 self.rollout_buffer,
                 n_rollout_steps=self.n_steps,
                 classifier=classifier,
-                adv_coef=adv_coef,
                 agent_normal=agent_normal,
                 train_classifier=train_classifier,
             )

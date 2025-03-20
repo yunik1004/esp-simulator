@@ -87,6 +87,7 @@ def main(args: argparse.Namespace) -> None:
         verbose=1,
         device=fabric.device,
         adversary=True,
+        adv_coef=args.adv_coef,
     )
     if args.checkpoint != "":
         model.set_parameters(args.checkpoint)
@@ -141,7 +142,6 @@ def main(args: argparse.Namespace) -> None:
         callback=CallbackList(callbacks),
         tb_log_name=args.log_name,
         classifier=classifier,
-        adv_coef=args.adv_coef,
         agent_normal=model_normal,
         optimizer_classifier=optimizer_classifier,
     )
