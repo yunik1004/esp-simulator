@@ -13,7 +13,7 @@ from stable_baselines3.common.utils import get_latest_run_id
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
-from esp_simulator.policies.item_farm import construct_ItemFarmPPO
+from esp_simulator.policies.item_farm_ppo import construct_ItemFarmPPO
 
 from utils.agents import add_argument_train_agent
 from utils.environments import add_argument_environment, make_env

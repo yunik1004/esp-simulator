@@ -7,7 +7,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from tqdm import tqdm
 
 from esp_simulator.environments.actions import ItemFarmActions
-from esp_simulator.policies.item_farm import ItemFarmPPO
+from esp_simulator.policies.item_farm_ppo import ItemFarmPPO
 from esp_simulator.utils.parser import parse_str2intlist
 from esp_simulator.utils.vec_env import EvaluateVecEnv
 

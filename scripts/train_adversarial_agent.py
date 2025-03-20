@@ -19,7 +19,7 @@ from torch import nn
 from torch.optim import AdamW
 
 from esp_simulator.models.item_farm import ItemFarmAntiCheater
-from esp_simulator.policies.item_farm import construct_ItemFarmPPO
+from esp_simulator.policies.item_farm_ppo import construct_ItemFarmPPO
 
 from utils.agents import add_argument_train_agent
 from utils.environments import add_argument_environment, make_env

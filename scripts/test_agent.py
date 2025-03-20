@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 
 from esp_simulator.environments.actions import ItemFarmActions
-from esp_simulator.policies.item_farm import ItemFarmPPO
+from esp_simulator.policies.item_farm_ppo import ItemFarmPPO
 from esp_simulator.utils.vec_env import InferenceVecEnv
 from esp_simulator.utils.vec_wrapper import VecVideoRecorderWrapper
 
