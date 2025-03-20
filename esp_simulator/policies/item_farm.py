@@ -303,7 +303,11 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                             logit = classifier(map)
                     pred = th.sigmoid(logit)
                     pred_buffer.append(logit)
+
+                    # num_timestep = infos[idx]["episode"]["l"]
+                    # rewards[idx] += adv_coef * np.exp(self.gamma, -num_timestep) * np.log(1 + np.exp(-logit.item()))
                     rewards[idx] -= adv_coef * logit.item()
+
                     self.ep_adv_buffer.extend([pred.item()])
 
             rollout_buffer.add(
