@@ -7,10 +7,11 @@ from stable_baselines3 import A2C
 from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.type_aliases import MaybeCallback
-from stable_baselines3.common.utils import obs_as_tensor, safe_mean
+from stable_baselines3.common.utils import explained_variance, obs_as_tensor, safe_mean
 from stable_baselines3.common.vec_env import VecEnv
 import torch as th
 from torch import nn
+from torch.nn import functional as F
 from torchmetrics import AUROC, AveragePrecision
 
 from ..models.item_farm import ItemFarmMultiFeaturesExtractor
@@ -453,10 +454,6 @@ class ItemFarmAdversarialA2C(ItemFarmA2C):
                     pred = th.sigmoid(logit)
                     pred_buffer.append(logit)
 
-                    # num_timestep = infos[idx]["episode"]["l"]
-                    # rewards[idx] += self.adv_coef * np.exp(self.gamma, -num_timestep) * np.log(1 + np.exp(-logit.item()))
-                    rewards[idx] -= self.adv_coef * logit.item()
-
                     self.ep_adv_buffer.extend([pred.item()])
 
             rollout_buffer.add(
@@ -491,6 +488,74 @@ class ItemFarmAdversarialA2C(ItemFarmA2C):
         callback.on_rollout_end()
 
         return True, (pred_cheater, pred_normal)
+
+    def train_policy_gradient(self) -> None:
+        """
+        Update policy using the currently gathered
+        rollout buffer (one gradient step over whole data).
+        """
+        # Switch to train mode (this affects batch norm / dropout)
+        self.policy.set_training_mode(True)
+
+        # Update optimizer learning rate
+        self._update_learning_rate(self.policy.optimizer)
+
+        # This will only loop once (get all data in one go)
+        for rollout_data in self.rollout_buffer.get(batch_size=None):
+            actions = rollout_data.actions
+            if isinstance(self.action_space, spaces.Discrete):
+                # Convert discrete action from float to long
+                actions = actions.long().flatten()
+
+            values, log_prob, entropy = self.policy.evaluate_actions(
+                rollout_data.observations, actions
+            )
+            values = values.flatten()
+
+            # Normalize advantage (not present in the original implementation)
+            advantages = rollout_data.advantages
+            if self.normalize_advantage:
+                advantages = (advantages - advantages.mean()) / (
+                    advantages.std() + 1e-8
+                )
+
+            # Policy gradient loss
+            policy_loss = -(advantages * log_prob).mean()
+
+            # Value loss using the TD(gae_lambda) target
+            value_loss = F.mse_loss(rollout_data.returns, values)
+
+            # Entropy loss favor exploration
+            if entropy is None:
+                # Approximate entropy when no analytical form
+                entropy_loss = -th.mean(-log_prob)
+            else:
+                entropy_loss = -th.mean(entropy)
+
+            loss = (
+                policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
+            )
+
+            # Optimization step
+            self.policy.optimizer.zero_grad()
+            loss.backward()
+
+            # Clip grad norm
+            th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+            self.policy.optimizer.step()
+
+        explained_var = explained_variance(
+            self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten()
+        )
+
+        self._n_updates += 1
+        self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
+        self.logger.record("train/explained_variance", explained_var)
+        self.logger.record("train/entropy_loss", entropy_loss.item())
+        self.logger.record("train/policy_loss", policy_loss.item())
+        self.logger.record("train/value_loss", value_loss.item())
+        if hasattr(self.policy, "log_std"):
+            self.logger.record("train/std", th.exp(self.policy.log_std).mean().item())
 
     def adversarial_learn(
         self,
@@ -583,7 +648,7 @@ class ItemFarmAdversarialA2C(ItemFarmA2C):
             if method == "reward_shaping":
                 self.train()
             elif method == "policy_gradient":
-                self.train()
+                self.train_policy_gradient()
 
             # Compute AUROC and AP
             pred = th.concat([pred_cheater, pred_normal], dim=0)
