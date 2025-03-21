@@ -204,6 +204,13 @@ def get_args() -> argparse.Namespace:
         action="store_true",
         help="train the classifier",
     )
+    parser.add_argument(
+        "--method",
+        type=str,
+        default="policy_gradient",
+        choices=["reward_shaping", "policy_gradient"],
+        help="adversarial training method",
+    )
     return parser.parse_args()
 
 

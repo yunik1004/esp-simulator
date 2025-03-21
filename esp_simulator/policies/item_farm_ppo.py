@@ -354,9 +354,11 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         classifier: nn.Module | None = None,
         agent_normal: PPO | None = None,
         optimizer_classifier: th.optim.Optimizer | None = None,
+        method: str = "reward_shaping",
     ):
         assert classifier is not None
         assert agent_normal is not None
+        assert method in ["reward_shaping"]
         train_classifier = optimizer_classifier is not None
         if train_classifier:
             classifier.train()

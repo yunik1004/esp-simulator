@@ -343,6 +343,155 @@ class ItemFarmAdversarialA2C(ItemFarmA2C):
 
         return True, (pred_cheater, pred_normal)
 
+    def collect_adversarial_rollouts_policy_gradient(
+        self,
+        env: VecEnv,
+        callback: BaseCallback,
+        rollout_buffer: RolloutBuffer,
+        n_rollout_steps: int,
+        classifier: nn.Module,
+        agent_normal: A2C,
+        train_classifier: bool,
+    ) -> tuple[bool, tuple[th.Tensor, th.Tensor]]:
+        """
+        Collect experiences using the current policy and fill a ``RolloutBuffer``.
+        The term rollout here refers to the model-free notion and should not
+        be used with the concept of rollout used in model-based RL or planning.
+
+        :param env: The training environment
+        :param callback: Callback that will be called at each step
+            (and at the beginning and end of the rollout)
+        :param rollout_buffer: Buffer to fill with rollouts
+        :param n_rollout_steps: Number of experiences to collect per environment
+        :return: True if function returned with at least `n_rollout_steps`
+            collected, False if callback terminated rollout prematurely.
+        """
+        assert self._last_obs is not None, "No previous observation was provided"
+        # Switch to eval mode (this affects batch norm / dropout)
+        self.policy.set_training_mode(False)
+
+        pred_buffer = []
+
+        n_steps = 0
+        rollout_buffer.reset()
+        # Sample new weights for the state dependent exploration
+        if self.use_sde:
+            self.policy.reset_noise(env.num_envs)
+
+        callback.on_rollout_start()
+
+        while n_steps < n_rollout_steps:
+            if (
+                self.use_sde
+                and self.sde_sample_freq > 0
+                and n_steps % self.sde_sample_freq == 0
+            ):
+                # Sample a new noise matrix
+                self.policy.reset_noise(env.num_envs)
+
+            with th.no_grad():
+                # Convert to pytorch tensor or to TensorDict
+                obs_tensor = obs_as_tensor(self._last_obs, self.device)
+                actions, values, log_probs = self.policy(obs_tensor)
+            actions = actions.cpu().numpy()
+
+            # Rescale and perform action
+            clipped_actions = actions
+
+            if isinstance(self.action_space, spaces.Box):
+                if self.policy.squash_output:
+                    # Unscale the actions to match env bounds
+                    # if they were previously squashed (scaled in [-1, 1])
+                    clipped_actions = self.policy.unscale_action(clipped_actions)
+                else:
+                    # Otherwise, clip the actions to avoid out of bound error
+                    # as we are sampling from an unbounded Gaussian distribution
+                    clipped_actions = np.clip(
+                        actions, self.action_space.low, self.action_space.high
+                    )
+
+            new_obs, rewards, dones, infos = env.step(clipped_actions)
+
+            self.num_timesteps += env.num_envs
+
+            # Give access to local variables
+            callback.update_locals(locals())
+            if not callback.on_step():
+                return False, (None, None)
+
+            self._update_info_buffer(infos, dones)
+            n_steps += 1
+
+            if isinstance(self.action_space, spaces.Discrete):
+                # Reshape in case of discrete action
+                actions = actions.reshape(-1, 1)
+
+            # Handle timeout by bootstrapping with value function
+            # see GitHub issue #633
+            for idx, done in enumerate(dones):
+                if (
+                    done
+                    and infos[idx].get("terminal_observation") is not None
+                    and infos[idx].get("TimeLimit.truncated", False)
+                ):
+                    terminal_obs = self.policy.obs_to_tensor(
+                        infos[idx]["terminal_observation"]
+                    )[0]
+                    with th.no_grad():
+                        terminal_value = self.policy.predict_values(terminal_obs)[0]  # type: ignore[arg-type]
+                    rewards[idx] += self.gamma * terminal_value
+
+                if done:
+                    # Adversarial reward
+                    map = infos[idx]["visual_status"]
+                    map = th.tensor(map, device=self.device).float().unsqueeze(0)
+                    if train_classifier:
+                        logit = classifier(map)
+                    else:
+                        with th.no_grad():
+                            logit = classifier(map)
+                    pred = th.sigmoid(logit)
+                    pred_buffer.append(logit)
+
+                    # num_timestep = infos[idx]["episode"]["l"]
+                    # rewards[idx] += self.adv_coef * np.exp(self.gamma, -num_timestep) * np.log(1 + np.exp(-logit.item()))
+                    rewards[idx] -= self.adv_coef * logit.item()
+
+                    self.ep_adv_buffer.extend([pred.item()])
+
+            rollout_buffer.add(
+                self._last_obs,  # type: ignore[arg-type]
+                actions,
+                rewards,
+                self._last_episode_starts,  # type: ignore[arg-type]
+                values,
+                log_probs,
+            )
+            self._last_obs = new_obs  # type: ignore[assignment]
+            self._last_episode_starts = dones
+
+        # Normal input prediction
+        pred_cheater = th.concat(pred_buffer, dim=0)
+
+        batch_size = pred_cheater.shape[0]
+        vis_normal = agent_normal.collect_visual_status(
+            env=agent_normal.env,
+            batch_size=batch_size,
+        )
+        pred_normal = classifier(vis_normal)
+
+        with th.no_grad():
+            # Compute value for the last timestep
+            values = self.policy.predict_values(obs_as_tensor(new_obs, self.device))  # type: ignore[arg-type]
+
+        rollout_buffer.compute_returns_and_advantage(last_values=values, dones=dones)
+
+        callback.update_locals(locals())
+
+        callback.on_rollout_end()
+
+        return True, (pred_cheater, pred_normal)
+
     def adversarial_learn(
         self,
         total_timesteps: int,
@@ -354,9 +503,11 @@ class ItemFarmAdversarialA2C(ItemFarmA2C):
         classifier: nn.Module | None = None,
         agent_normal: A2C | None = None,
         optimizer_classifier: th.optim.Optimizer | None = None,
+        method: str = "policy_gradient",
     ):
         assert classifier is not None
         assert agent_normal is not None
+        assert method in ["reward_shaping", "policy_gradient"]
         train_classifier = optimizer_classifier is not None
         if train_classifier:
             classifier.train()
@@ -390,17 +541,30 @@ class ItemFarmAdversarialA2C(ItemFarmA2C):
             if train_classifier:
                 optimizer_classifier.zero_grad()
 
-            continue_training, (pred_cheater, pred_normal) = (
-                self.collect_adversarial_rollouts_reward_shaping(
-                    self.env,
-                    callback,
-                    self.rollout_buffer,
-                    n_rollout_steps=self.n_steps,
-                    classifier=classifier,
-                    agent_normal=agent_normal,
-                    train_classifier=train_classifier,
+            if method == "reward_shaping":
+                continue_training, (pred_cheater, pred_normal) = (
+                    self.collect_adversarial_rollouts_reward_shaping(
+                        self.env,
+                        callback,
+                        self.rollout_buffer,
+                        n_rollout_steps=self.n_steps,
+                        classifier=classifier,
+                        agent_normal=agent_normal,
+                        train_classifier=train_classifier,
+                    )
                 )
-            )
+            elif method == "policy_gradient":
+                continue_training, (pred_cheater, pred_normal) = (
+                    self.collect_adversarial_rollouts_policy_gradient(
+                        self.env,
+                        callback,
+                        self.rollout_buffer,
+                        n_rollout_steps=self.n_steps,
+                        classifier=classifier,
+                        agent_normal=agent_normal,
+                        train_classifier=train_classifier,
+                    )
+                )
 
             if not continue_training:
                 break
@@ -416,7 +580,10 @@ class ItemFarmAdversarialA2C(ItemFarmA2C):
                 assert self.ep_info_buffer is not None
                 self._dump_logs(iteration)
 
-            self.train()
+            if method == "reward_shaping":
+                self.train()
+            elif method == "policy_gradient":
+                self.train()
 
             # Compute AUROC and AP
             pred = th.concat([pred_cheater, pred_normal], dim=0)
