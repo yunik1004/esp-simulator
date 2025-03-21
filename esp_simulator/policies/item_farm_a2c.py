@@ -1,4 +1,5 @@
 from collections import deque
+from collections.abc import Generator
 from typing import List
 
 from gymnasium import spaces
@@ -6,7 +7,7 @@ import numpy as np
 from stable_baselines3 import A2C
 from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.type_aliases import MaybeCallback
+from stable_baselines3.common.type_aliases import MaybeCallback, RolloutBufferSamples
 from stable_baselines3.common.utils import explained_variance, obs_as_tensor, safe_mean
 from stable_baselines3.common.vec_env import VecEnv
 import torch as th
@@ -58,6 +59,24 @@ class ItemFarmA2C(A2C):
             )
 
         super()._dump_logs(iteration)
+
+    def learn(
+        self,
+        total_timesteps: int,
+        callback: MaybeCallback = None,
+        log_interval: int = 1,
+        tb_log_name: str = "A2C",
+        reset_num_timesteps: bool = True,
+        progress_bar: bool = False,
+    ):
+        return super().learn(
+            total_timesteps=total_timesteps,
+            callback=callback,
+            log_interval=log_interval,
+            tb_log_name=tb_log_name,
+            reset_num_timesteps=reset_num_timesteps,
+            progress_bar=progress_bar,
+        )
 
     def collect_visual_status(
         self,
@@ -138,6 +157,28 @@ class ItemFarmA2C(A2C):
         output_tensor = th.stack(output_buffer[:batch_size], dim=0)
 
         return output_tensor
+
+
+def rollout_buffer_get_no_random(
+    self: RolloutBuffer,
+) -> Generator[RolloutBufferSamples, None, None]:
+    assert self.full, ""
+    indices = np.arange(self.buffer_size * self.n_envs)
+    # Prepare the data
+    if not self.generator_ready:
+        if isinstance(self.observations, dict):
+            for key, obs in self.observations.items():
+                self.observations[key] = self.swap_and_flatten(obs)
+        else:
+            self.observations = self.swap_and_flatten(self.observations)
+
+        _tensor_names = ["actions", "values", "log_probs", "advantages", "returns"]
+
+        for tensor in _tensor_names:
+            self.__dict__[tensor] = self.swap_and_flatten(self.__dict__[tensor])
+        self.generator_ready = True
+
+    yield self._get_samples(indices)
 
 
 class ItemFarmAdversarialA2C(ItemFarmA2C):
@@ -501,7 +542,7 @@ class ItemFarmAdversarialA2C(ItemFarmA2C):
         self._update_learning_rate(self.policy.optimizer)
 
         # This will only loop once (get all data in one go)
-        for rollout_data in self.rollout_buffer.get(batch_size=None):
+        for rollout_data in rollout_buffer_get_no_random(self.rollout_buffer):
             actions = rollout_data.actions
             if isinstance(self.action_space, spaces.Discrete):
                 # Convert discrete action from float to long
@@ -532,8 +573,14 @@ class ItemFarmAdversarialA2C(ItemFarmA2C):
             else:
                 entropy_loss = -th.mean(entropy)
 
+            # Adversarial loss
+            adv_loss = 0  # th.zeros(1)
+
             loss = (
-                policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
+                policy_loss
+                + self.ent_coef * entropy_loss
+                + self.vf_coef * value_loss
+                + self.adv_coef * adv_loss
             )
 
             # Optimization step
