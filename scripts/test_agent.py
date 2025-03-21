@@ -10,10 +10,11 @@ import numpy as np
 from PIL import Image
 
 from esp_simulator.environments.actions import ItemFarmActions
-from esp_simulator.policies.item_farm_ppo import ItemFarmPPO
+from esp_simulator.policies import load_ItemFarmPolicy
 from esp_simulator.utils.vec_env import InferenceVecEnv
 from esp_simulator.utils.vec_wrapper import VecVideoRecorderWrapper
 
+from utils.algorithms import add_argument_algorithm
 from utils.environments import add_argument_environment, make_env
 
 
@@ -58,7 +59,7 @@ def main(args: argparse.Namespace) -> None:
     # Load model
     model = None
     if not args.optimal:
-        model = ItemFarmPPO.load(args.checkpoint, device=fabric.device)
+        model = load_ItemFarmPolicy(args.checkpoint, device=fabric.device)
         model.set_random_seed(args.seed_policy)
 
     # Initialize the environment
@@ -148,6 +149,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--seed_policy", type=int, nargs="?", help="random seed for policy"
     )
+    add_argument_algorithm(parser)
     add_argument_environment(parser)
     return parser.parse_args()
 

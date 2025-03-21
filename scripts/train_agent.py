@@ -13,9 +13,10 @@ from stable_baselines3.common.utils import get_latest_run_id
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
-from esp_simulator.policies.item_farm_ppo import construct_ItemFarmPPO
+from esp_simulator.policies import construct_ItemFarmPolicy
 
 from utils.agents import add_argument_train_agent
+from utils.algorithms import add_argument_algorithm
 from utils.environments import add_argument_environment, make_env
 
 
@@ -38,9 +39,11 @@ def main(args: argparse.Namespace) -> None:
         vec_env_cls=SubprocVecEnv,
     )
 
-    model = construct_ItemFarmPPO(
+    model = construct_ItemFarmPolicy(
+        algorithm=args.algo,
         env=vec_env,
         learning_rate=args.lr,
+        n_steps=args.n_steps,
         ent_coef=args.ent_coef,
         batch_size=args.batch_size,
         n_epochs=args.num_epochs,
@@ -81,6 +84,8 @@ def get_args() -> argparse.Namespace:
         "--accelerator", type=str, default="auto", help="training accelerator"
     )
     parser.add_argument("--seed", type=int, default=0, help="random seed")
+
+    add_argument_algorithm(parser)
     add_argument_environment(parser)
     add_argument_train_agent(parser)
     return parser.parse_args()

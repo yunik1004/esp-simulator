@@ -10,6 +10,12 @@ def add_argument_train_agent(parser: argparse.ArgumentParser):
     )
     parser.add_argument("--lr", type=float, default=3e-4, help="learning rate")
     parser.add_argument(
+        "--n_steps",
+        type=int,
+        default=2048,
+        help="the number of steps to run for each environment per update",
+    )
+    parser.add_argument(
         "--ent_coef", type=float, default=0.01, help="entropy coefficient"
     )
     parser.add_argument(
@@ -24,7 +30,7 @@ def add_argument_train_agent(parser: argparse.ArgumentParser):
     parser.add_argument(
         "--num_timesteps", type=int, default=int(1e8), help="the number of timesteps"
     )
-    parser.add_argument("--batch_size", type=int, default=512, help="batch size")
+    parser.add_argument("--batch_size", type=int, default=512, help="minibatch size")
     parser.add_argument(
         "--checkpoint_freq",
         type=int,

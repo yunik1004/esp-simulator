@@ -9,9 +9,10 @@ from stable_baselines3.common.env_util import make_vec_env
 from tqdm import trange
 
 from esp_simulator.environments.actions import ItemFarmActions
-from esp_simulator.policies.item_farm_ppo import ItemFarmPPO
+from esp_simulator.policies import load_ItemFarmPolicy
 from esp_simulator.utils.vec_env import EvaluateVecEnv
 
+from utils.algorithms import add_argument_algorithm
 from utils.environments import add_argument_environment, make_env
 
 
@@ -37,7 +38,7 @@ def main(args: argparse.Namespace) -> None:
     # Load model
     model = None
     if not args.optimal:
-        model = ItemFarmPPO.load(args.checkpoint, device=fabric.device)
+        model = load_ItemFarmPolicy(args.checkpoint, device=fabric.device)
 
     steps_list = np.array([], dtype=int)
     steps_ratio_list = np.array([])
@@ -132,6 +133,7 @@ def get_args() -> argparse.Namespace:
         help="the number of repetitions",
     )
     parser.add_argument("--seed", type=int, default=0, help="random seed")
+    add_argument_algorithm(parser)
     add_argument_environment(parser)
     return parser.parse_args()
 

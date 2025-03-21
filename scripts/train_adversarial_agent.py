@@ -19,9 +19,10 @@ from torch import nn
 from torch.optim import AdamW
 
 from esp_simulator.models.item_farm import ItemFarmAntiCheater
-from esp_simulator.policies.item_farm_ppo import construct_ItemFarmPPO
+from esp_simulator.policies import construct_ItemFarmPolicy
 
 from utils.agents import add_argument_train_agent
+from utils.algorithms import add_argument_algorithm
 from utils.environments import add_argument_environment, make_env
 
 
@@ -77,9 +78,11 @@ def main(args: argparse.Namespace) -> None:
         vec_env_cls=SubprocVecEnv,
     )
 
-    model = construct_ItemFarmPPO(
+    model = construct_ItemFarmPolicy(
+        algorithm=args.algo,
         env=vec_env,
         learning_rate=args.lr,
+        n_steps=args.n_steps,
         ent_coef=args.ent_coef,
         batch_size=args.batch_size,
         n_epochs=args.num_epochs,
@@ -100,7 +103,8 @@ def main(args: argparse.Namespace) -> None:
         seed=args.seed,
         vec_env_cls=SubprocVecEnv,
     )
-    model_normal = construct_ItemFarmPPO(
+    model_normal = construct_ItemFarmPolicy(
+        algorithm=args.algo,
         env=vec_env_normal,
         device=fabric.device,
     )
@@ -169,6 +173,7 @@ def get_args() -> argparse.Namespace:
         default=3,
         help="view size of the normal agent. fully observable if < 0",
     )
+    add_argument_algorithm(parser)
     add_argument_train_agent(parser)
     parser.add_argument(
         "--adv_coef", type=float, default=0.1, help="adversarial training coefficient"
