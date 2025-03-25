@@ -8,11 +8,10 @@ from stable_baselines3 import A2C
 from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.type_aliases import MaybeCallback, RolloutBufferSamples
-from stable_baselines3.common.utils import explained_variance, obs_as_tensor, safe_mean
+from stable_baselines3.common.utils import obs_as_tensor, safe_mean
 from stable_baselines3.common.vec_env import VecEnv
 import torch as th
 from torch import nn
-from torch.nn import functional as F
 from torchmetrics import AUROC, AveragePrecision
 
 from ..models.item_farm import ItemFarmMultiFeaturesExtractor
