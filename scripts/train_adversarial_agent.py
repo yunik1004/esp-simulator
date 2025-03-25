@@ -148,6 +148,7 @@ def main(args: argparse.Namespace) -> None:
         classifier=classifier,
         agent_normal=model_normal,
         optimizer_classifier=optimizer_classifier,
+        method="policy_gradient",
     )
 
     vec_env.close()

@@ -1,12 +1,13 @@
 from collections import deque
-from typing import List
+from collections.abc import Generator
+from typing import List, Optional
 
 from gymnasium import spaces
 import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.type_aliases import MaybeCallback
+from stable_baselines3.common.type_aliases import MaybeCallback, RolloutBufferSamples
 from stable_baselines3.common.utils import explained_variance, obs_as_tensor, safe_mean
 from stable_baselines3.common.vec_env import VecEnv
 import torch as th
@@ -138,6 +139,37 @@ class ItemFarmPPO(PPO):
         output_tensor = th.stack(output_buffer[:batch_size], dim=0)
 
         return output_tensor
+
+
+def rollout_buffer_get_with_index(
+    self: RolloutBuffer,
+    batch_size: Optional[int] = None,
+) -> Generator[RolloutBufferSamples, None, None]:
+    assert self.full, ""
+    indices = np.random.permutation(self.buffer_size * self.n_envs)
+    # Prepare the data
+    if not self.generator_ready:
+        if isinstance(self.observations, dict):
+            for key, obs in self.observations.items():
+                self.observations[key] = self.swap_and_flatten(obs)
+        else:
+            self.observations = self.swap_and_flatten(self.observations)
+
+        _tensor_names = ["actions", "values", "log_probs", "advantages", "returns"]
+
+        for tensor in _tensor_names:
+            self.__dict__[tensor] = self.swap_and_flatten(self.__dict__[tensor])
+        self.generator_ready = True
+
+    # Return everything, don't create minibatches
+    if batch_size is None:
+        batch_size = self.buffer_size * self.n_envs
+
+    start_idx = 0
+    while start_idx < self.buffer_size * self.n_envs:
+        sampled_indices = indices[start_idx : start_idx + batch_size]
+        yield self._get_samples(sampled_indices), sampled_indices
+        start_idx += batch_size
 
 
 class ItemFarmAdversarialPPO(ItemFarmPPO):
@@ -352,7 +384,9 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         classifier: nn.Module,
         agent_normal: PPO,
         train_classifier: bool,
-    ) -> tuple[bool, tuple[th.Tensor, th.Tensor]]:
+    ) -> tuple[
+        bool, tuple[th.Tensor, th.Tensor], tuple[th.Tensor | None, th.Tensor | None]
+    ]:
         """
         Collect experiences using the current policy and fill a ``RolloutBuffer``.
         The term rollout here refers to the model-free notion and should not
@@ -374,6 +408,13 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
 
         n_steps = 0
         rollout_buffer.reset()
+        pos_prev = th.zeros(rollout_buffer.n_envs, dtype=th.long)
+        logit_buffer = th.zeros(
+            rollout_buffer.buffer_size, rollout_buffer.n_envs, dtype=th.float32
+        )
+        logit_mask = th.zeros(
+            rollout_buffer.buffer_size, rollout_buffer.n_envs, dtype=th.float32
+        )
         # Sample new weights for the state dependent exploration
         if self.use_sde:
             self.policy.reset_noise(env.num_envs)
@@ -417,7 +458,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
             # Give access to local variables
             callback.update_locals(locals())
             if not callback.on_step():
-                return False, (None, None)
+                return False, (None, None), (None, None)
 
             self._update_info_buffer(infos, dones)
             n_steps += 1
@@ -454,6 +495,10 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                     pred_buffer.append(logit)
                     self.ep_adv_buffer.extend([pred.item()])
 
+                    logit_buffer[pos_prev[idx] : rollout_buffer.pos, idx] = logit.item()
+                    logit_mask[pos_prev[idx] : rollout_buffer.pos, idx] = True
+                    pos_prev[idx] = rollout_buffer.pos
+
             rollout_buffer.add(
                 self._last_obs,  # type: ignore[arg-type]
                 actions,
@@ -485,9 +530,11 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
 
         callback.on_rollout_end()
 
-        return True, (pred_cheater, pred_normal)
+        return True, (pred_cheater, pred_normal), (logit_buffer, logit_mask)
 
-    def train_policy_gradient(self) -> None:
+    def train_policy_gradient(
+        self, logit_buffer: th.Tensor, logit_mask: th.Tensor
+    ) -> None:
         """
         Update policy using the currently gathered rollout buffer.
         """
@@ -505,12 +552,24 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         pg_losses, value_losses = [], []
         clip_fractions = []
 
+        logit_buffer_flatten = self.rollout_buffer.swap_and_flatten(logit_buffer)
+        logit_mask_flatten = self.rollout_buffer.swap_and_flatten(logit_mask)
+
         continue_training = True
         # train for n_epochs epochs
         for epoch in range(self.n_epochs):
             approx_kl_divs = []
             # Do a complete pass on the rollout buffer
-            for rollout_data in self.rollout_buffer.get(self.batch_size):
+            for rollout_data, data_indices in rollout_buffer_get_with_index(
+                self.rollout_buffer, self.batch_size
+            ):
+                logit_sample = logit_buffer_flatten[data_indices].squeeze()
+                mask_sample = logit_mask_flatten[data_indices].squeeze()
+
+                log_pred_sample = th.log(1 - th.sigmoid(logit_sample) + 1e-8)
+                log_pred_mean = th.mean(log_pred_sample[mask_sample > 0.5])
+                adv = (log_pred_sample - log_pred_mean) * mask_sample
+
                 actions = rollout_data.actions
                 if isinstance(self.action_space, spaces.Discrete):
                     # Convert discrete action from float to long
@@ -522,6 +581,10 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                 values = values.flatten()
                 # Normalize advantage
                 advantages = rollout_data.advantages
+
+                # Update advantage function
+                advantages += self.adv_coef * adv.to(advantages.device)
+
                 # Normalization does not make sense if mini batchsize == 1, see GH issue #325
                 if self.normalize_advantage and len(advantages) > 1:
                     advantages = (advantages - advantages.mean()) / (
@@ -634,7 +697,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         classifier: nn.Module | None = None,
         agent_normal: PPO | None = None,
         optimizer_classifier: th.optim.Optimizer | None = None,
-        method: str = "reward_shaping",
+        method: str = "policy_gradient",
     ):
         assert classifier is not None
         assert agent_normal is not None
@@ -673,16 +736,18 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                 optimizer_classifier.zero_grad()
 
             if method == "policy_gradient":
-                continue_training, (pred_cheater, pred_normal) = (
-                    self.collect_adversarial_rollouts_policy_gradient(
-                        self.env,
-                        callback,
-                        self.rollout_buffer,
-                        n_rollout_steps=self.n_steps,
-                        classifier=classifier,
-                        agent_normal=agent_normal,
-                        train_classifier=train_classifier,
-                    )
+                (
+                    continue_training,
+                    (pred_cheater, pred_normal),
+                    (logit_buffer, logit_mask),
+                ) = self.collect_adversarial_rollouts_policy_gradient(
+                    self.env,
+                    callback,
+                    self.rollout_buffer,
+                    n_rollout_steps=self.n_steps,
+                    classifier=classifier,
+                    agent_normal=agent_normal,
+                    train_classifier=train_classifier,
                 )
             elif method == "reward_shaping":
                 continue_training, (pred_cheater, pred_normal) = (
@@ -712,7 +777,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                 self._dump_logs(iteration)
 
             if method == "policy_gradient":
-                self.train_policy_gradient()
+                self.train_policy_gradient(logit_buffer, logit_mask)
             elif method == "reward_shaping":
                 self.train()
 
