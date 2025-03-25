@@ -304,8 +304,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                     pred = th.sigmoid(logit)
                     pred_buffer.append(logit)
 
-                    # num_timestep = infos[idx]["episode"]["l"]
-                    # rewards[idx] += self.adv_coef * np.exp(self.gamma, -num_timestep) * np.log(1 + np.exp(-logit.item()))
+                    # rewards[idx] += self.adv_coef * np.log(1 + np.exp(-logit.item()))
                     rewards[idx] -= self.adv_coef * logit.item()
 
                     self.ep_adv_buffer.extend([pred.item()])
