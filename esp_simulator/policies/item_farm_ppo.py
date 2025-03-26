@@ -552,8 +552,14 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         pg_losses, value_losses = [], []
         clip_fractions = []
 
-        logit_buffer_flatten = self.rollout_buffer.swap_and_flatten(logit_buffer)
-        logit_mask_flatten = self.rollout_buffer.swap_and_flatten(logit_mask)
+        logit_buffer_flatten = self.rollout_buffer.swap_and_flatten(
+            logit_buffer
+        ).squeeze()
+        logit_mask_flatten = self.rollout_buffer.swap_and_flatten(logit_mask).squeeze()
+
+        log_pred = th.log(1 - th.sigmoid(logit_buffer_flatten) + 1e-8)
+        log_pred_mean = th.mean(log_pred[logit_mask_flatten > 0.5])
+        adv_full = (log_pred - log_pred_mean) * logit_mask_flatten
 
         continue_training = True
         # train for n_epochs epochs
@@ -563,12 +569,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
             for rollout_data, data_indices in rollout_buffer_get_with_index(
                 self.rollout_buffer, self.batch_size
             ):
-                logit_sample = logit_buffer_flatten[data_indices].squeeze()
-                mask_sample = logit_mask_flatten[data_indices].squeeze()
-
-                log_pred_sample = th.log(1 - th.sigmoid(logit_sample) + 1e-8)
-                log_pred_mean = th.mean(log_pred_sample[mask_sample > 0.5])
-                adv = (log_pred_sample - log_pred_mean) * mask_sample
+                adv = adv_full[data_indices]
 
                 actions = rollout_data.actions
                 if isinstance(self.action_space, spaces.Discrete):
