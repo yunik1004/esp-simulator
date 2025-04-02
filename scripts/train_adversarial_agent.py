@@ -86,6 +86,7 @@ def main(args: argparse.Namespace) -> None:
         ent_coef=args.ent_coef,
         batch_size=args.batch_size,
         n_epochs=args.num_epochs,
+        gamma=args.gamma,
         tensorboard_log=args.log_dir,
         verbose=1,
         device=fabric.device,
@@ -148,7 +149,7 @@ def main(args: argparse.Namespace) -> None:
         classifier=classifier,
         agent_normal=model_normal,
         optimizer_classifier=optimizer_classifier,
-        method="policy_gradient",
+        method="reward_shaping",
     )
 
     vec_env.close()

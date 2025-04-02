@@ -47,6 +47,7 @@ def main(args: argparse.Namespace) -> None:
         ent_coef=args.ent_coef,
         batch_size=args.batch_size,
         n_epochs=args.num_epochs,
+        gamma=args.gamma,
         tensorboard_log=args.log_dir,
         verbose=1,
         device=fabric.device,

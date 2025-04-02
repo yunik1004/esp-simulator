@@ -31,6 +31,7 @@ def add_argument_train_agent(parser: argparse.ArgumentParser):
         "--num_timesteps", type=int, default=int(1e8), help="the number of timesteps"
     )
     parser.add_argument("--batch_size", type=int, default=512, help="minibatch size")
+    parser.add_argument("--gamma", type=float, default=0.99, help="discount factor")
     parser.add_argument(
         "--checkpoint_freq",
         type=int,
