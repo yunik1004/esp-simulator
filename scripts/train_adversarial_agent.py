@@ -92,6 +92,7 @@ def main(args: argparse.Namespace) -> None:
         device=fabric.device,
         adversary=True,
         adv_coef=args.adv_coef,
+        adv_thre=args.adv_thre,
     )
     if args.checkpoint != "":
         model.set_parameters(args.checkpoint)
@@ -179,6 +180,9 @@ def get_args() -> argparse.Namespace:
     add_argument_train_agent(parser)
     parser.add_argument(
         "--adv_coef", type=float, default=0.1, help="adversarial training coefficient"
+    )
+    parser.add_argument(
+        "--adv_thre", type=float, default=0.99, help="adversarial training threshold"
     )
     parser.add_argument(
         "--checkpoint", type=str, default="", help="checkpoint of the model"

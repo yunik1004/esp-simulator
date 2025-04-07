@@ -181,9 +181,10 @@ def rollout_buffer_get_no_random(
 
 
 class ItemFarmAdversarialA2C(ItemFarmA2C):
-    def __init__(self, adv_coef: float = 0.0, *args, **kwargs):
+    def __init__(self, adv_coef: float = 0.0, adv_thre: float = 0.99, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.adv_coef = adv_coef
+        self.adv_thre = adv_thre
         self.ep_adv_buffer = None
         self.ep_cls_buffer = None
         self.ep_auroc_buffer = None
@@ -345,8 +346,10 @@ class ItemFarmAdversarialA2C(ItemFarmA2C):
                     pred = th.sigmoid(logit)
                     pred_buffer.append(logit)
 
-                    # rewards[idx] += self.adv_coef * np.log(1 + np.exp(-logit.item()))
-                    rewards[idx] -= self.adv_coef * logit.item()
+                    adv_penalty = logit.item() + np.log(
+                        1 - np.min((pred.item(), self.adv_thre))
+                    )
+                    rewards[idx] -= self.adv_coef * adv_penalty
 
                     self.ep_adv_buffer.extend([pred.item()])
 
