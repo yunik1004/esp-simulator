@@ -33,7 +33,7 @@ def make_env(args: argparse.Namespace, **kwags) -> gym.Env:
         **kwags,
     )
     env = ImgScaleWrapper(env)
-    env = ObsSelectionWrapper(env, ["image", "item"])
+    env = ObsSelectionWrapper(env, ["image", "item", "time"])
 
     env = VisualizeFinalStatusWrapper(env)
 

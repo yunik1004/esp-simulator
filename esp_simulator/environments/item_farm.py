@@ -77,6 +77,9 @@ class BaseItemFarmEnv(MiniGridEnv):
             dtype="uint8",
         )
         self.observation_space["item"] = spaces.Discrete(self.num_items)
+        self.observation_space["time"] = spaces.Box(
+            low=0, high=1, shape=(1,), dtype=float
+        )
 
         # Items
         self.items = []
@@ -164,6 +167,7 @@ class BaseItemFarmEnv(MiniGridEnv):
             obs["image"][~self.highlight_mask] = (OBJECT_TO_IDX["unseen"], 0, 0)
 
         obs["item"] = self.num_items - self.num_items_remain
+        obs["time"] = np.array([self.step_count / self.max_steps])
         return obs
 
     def step(self, action):
