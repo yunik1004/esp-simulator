@@ -96,8 +96,6 @@ class ItemFarmMultiFeaturesExtractor(BaseFeaturesExtractor):
                     nn.Flatten(), nn.Linear(obs_dim, obs_dim)
                 )
                 total_concat_size += obs_dim
-                out = subspace.sample()
-                print(out)
 
         self.extractors = nn.ModuleDict(extractors)
 
