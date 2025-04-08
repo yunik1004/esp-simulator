@@ -129,8 +129,8 @@ class BaseItemFarmEnv(MiniGridEnv):
         )
 
         for lex_pos in items_lex_pos:
-            w_pos = lex_pos % (width - 2) + 1
-            h_pos = lex_pos // (width - 2) + 1
+            w_pos = int(lex_pos % (width - 2) + 1)
+            h_pos = int(lex_pos // (width - 2) + 1)
             self.put_obj(BallItem("green"), w_pos, h_pos)
             self.items.append((w_pos, h_pos))
 

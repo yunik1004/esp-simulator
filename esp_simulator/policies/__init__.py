@@ -21,7 +21,7 @@ def construct_ItemFarmPolicy(
 
 
 def load_ItemFarmPolicy(
-    algorithm: str = "a2c",
+    algorithm: str = "ppo",
     path: str | pathlib.Path | io.BufferedIOBase = "",
     device: torch.device | str = "auto",
 ):

@@ -110,7 +110,7 @@ def solve_minigrid_tsp(
 
     optimal_path = []
     while last_node != -1:
-        optimal_path.append((last_node, last_dir))
+        optimal_path.append((int(last_node), int(last_dir)))
         parent_node, parent_dir = parent[mask][last_node][last_dir]
         mask ^= 1 << last_node
         last_node, last_dir = parent_node, parent_dir

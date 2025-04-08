@@ -59,7 +59,11 @@ def main(args: argparse.Namespace) -> None:
     # Load model
     model = None
     if not args.optimal:
-        model = load_ItemFarmPolicy(args.checkpoint, device=fabric.device)
+        model = load_ItemFarmPolicy(
+            algorithm=args.algo,
+            path=args.checkpoint,
+            device=fabric.device,
+        )
         model.set_random_seed(args.seed_policy)
 
     # Initialize the environment
