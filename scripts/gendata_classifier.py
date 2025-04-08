@@ -33,7 +33,11 @@ def main(args: argparse.Namespace) -> None:
 
     model = None
     if not args.optimal:
-        model = load_ItemFarmPolicy(args.checkpoint, device=fabric.device)
+        model = load_ItemFarmPolicy(
+            algorithm=args.algo,
+            path=args.checkpoint,
+            device=fabric.device,
+        )
 
     maps = []
     for seed_env in tqdm(args.seed_envs):

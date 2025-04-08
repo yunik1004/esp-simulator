@@ -38,7 +38,11 @@ def main(args: argparse.Namespace) -> None:
     # Load model
     model = None
     if not args.optimal:
-        model = load_ItemFarmPolicy(args.checkpoint, device=fabric.device)
+        model = load_ItemFarmPolicy(
+            algorithm=args.algo,
+            path=args.checkpoint,
+            device=fabric.device,
+        )
 
     steps_list = np.array([], dtype=int)
     steps_ratio_list = np.array([])
