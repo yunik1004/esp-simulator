@@ -701,7 +701,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         classifier: nn.Module | None = None,
         agent_normal: PPO | None = None,
         optimizer_classifier: th.optim.Optimizer | None = None,
-        method: str = "policy_gradient",
+        method: str = "reward_shaping",
     ):
         assert classifier is not None
         assert agent_normal is not None
