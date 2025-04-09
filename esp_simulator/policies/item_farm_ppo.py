@@ -598,7 +598,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                 advantages = rollout_data.advantages
 
                 # Update advantage function
-                advantages += self.adv_coef * adv.to(advantages.device)
+                advantages -= self.adv_coef * adv.to(advantages.device)
 
                 # Normalization does not make sense if mini batchsize == 1, see GH issue #325
                 if self.normalize_advantage and len(advantages) > 1:
