@@ -181,10 +181,18 @@ def rollout_buffer_get_no_random(
 
 
 class ItemFarmAdversarialA2C(ItemFarmA2C):
-    def __init__(self, adv_coef: float = 0.0, adv_thre: float = 0.99, *args, **kwargs):
+    def __init__(
+        self,
+        adv_coef: float = 0.0,
+        adv_thre: float = 0.99,
+        cls_freq: int = 1,
+        *args,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.adv_coef = adv_coef
         self.adv_thre = adv_thre
+        self.cls_freq = cls_freq
         self.ep_adv_buffer = None
         self.ep_cls_buffer = None
         self.ep_auroc_buffer = None
@@ -481,7 +489,7 @@ class ItemFarmAdversarialA2C(ItemFarmA2C):
             ap = ap_func(pred, target)
             self.ep_ap_buffer.extend([ap.item()])
 
-            if train_classifier:
+            if train_classifier and iteration % self.cls_freq == 0:
                 loss = criterion(pred, target.float())
                 loss.backward()
 
