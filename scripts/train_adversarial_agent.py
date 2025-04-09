@@ -151,7 +151,7 @@ def main(args: argparse.Namespace) -> None:
         classifier=classifier,
         agent_normal=model_normal,
         optimizer_classifier=optimizer_classifier,
-        method="reward_shaping",
+        method=args.method,
     )
 
     vec_env.close()
