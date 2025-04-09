@@ -506,7 +506,10 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                     pred_buffer.append(logit)
                     self.ep_adv_buffer.extend([pred.item()])
 
-                    logit_buffer[pos_prev[idx] : rollout_buffer.pos, idx] = logit.item()
+                    adv_penalty = logit.item() + np.log(
+                        1 - np.min((pred.item(), self.adv_thre))
+                    )
+                    logit_buffer[pos_prev[idx] : rollout_buffer.pos, idx] = adv_penalty
                     logit_mask[pos_prev[idx] : rollout_buffer.pos, idx] = True
                     pos_prev[idx] = rollout_buffer.pos
 
@@ -568,7 +571,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         ).squeeze()
         logit_mask_flatten = self.rollout_buffer.swap_and_flatten(logit_mask).squeeze()
 
-        log_pred = th.log(1 - th.sigmoid(logit_buffer_flatten) + 1e-8)
+        log_pred = logit_buffer_flatten
         log_pred_mean = th.mean(log_pred[logit_mask_flatten > 0.5])
         adv_full = (log_pred - log_pred_mean) * logit_mask_flatten
 
