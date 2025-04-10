@@ -420,10 +420,10 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         n_steps = 0
         rollout_buffer.reset()
         pos_prev = th.zeros(rollout_buffer.n_envs, dtype=th.long)
-        logit_buffer = th.zeros(
+        penalty_buffer = th.zeros(
             rollout_buffer.buffer_size, rollout_buffer.n_envs, dtype=th.float32
         )
-        logit_mask = th.zeros(
+        penalty_mask = th.zeros(
             rollout_buffer.buffer_size, rollout_buffer.n_envs, dtype=th.float32
         )
         # Sample new weights for the state dependent exploration
@@ -509,8 +509,10 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                     adv_penalty = logit.item() + np.log(
                         1 - np.min((pred.item(), self.adv_thre))
                     )
-                    logit_buffer[pos_prev[idx] : rollout_buffer.pos, idx] = adv_penalty
-                    logit_mask[pos_prev[idx] : rollout_buffer.pos, idx] = True
+                    penalty_buffer[pos_prev[idx] : rollout_buffer.pos, idx] = (
+                        adv_penalty
+                    )
+                    penalty_mask[pos_prev[idx] : rollout_buffer.pos, idx] = True
                     pos_prev[idx] = rollout_buffer.pos
 
             rollout_buffer.add(
@@ -544,10 +546,10 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
 
         callback.on_rollout_end()
 
-        return True, (pred_cheater, pred_normal), (logit_buffer, logit_mask)
+        return True, (pred_cheater, pred_normal), (penalty_buffer, penalty_mask)
 
     def train_policy_gradient(
-        self, logit_buffer: th.Tensor, logit_mask: th.Tensor
+        self, penalty_buffer: th.Tensor, penalty_mask: th.Tensor
     ) -> None:
         """
         Update policy using the currently gathered rollout buffer.
@@ -566,14 +568,16 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         pg_losses, value_losses = [], []
         clip_fractions = []
 
-        logit_buffer_flatten = self.rollout_buffer.swap_and_flatten(
-            logit_buffer
+        penalty_buffer_flatten = self.rollout_buffer.swap_and_flatten(
+            penalty_buffer
         ).squeeze()
-        logit_mask_flatten = self.rollout_buffer.swap_and_flatten(logit_mask).squeeze()
+        penalty_mask_flatten = self.rollout_buffer.swap_and_flatten(
+            penalty_mask
+        ).squeeze()
 
-        log_pred = logit_buffer_flatten
-        log_pred_mean = th.mean(log_pred[logit_mask_flatten > 0.5])
-        adv_full = (log_pred - log_pred_mean) * logit_mask_flatten
+        penalty = penalty_buffer_flatten
+        penalty_mean = th.mean(penalty[penalty_mask_flatten > 0.5])
+        adv_penalty_full = (penalty - penalty_mean) * penalty_mask_flatten
 
         continue_training = True
         # train for n_epochs epochs
@@ -583,7 +587,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
             for rollout_data, data_indices in rollout_buffer_get_with_index(
                 self.rollout_buffer, self.batch_size
             ):
-                adv = adv_full[data_indices]
+                adv = adv_penalty_full[data_indices]
 
                 actions = rollout_data.actions
                 if isinstance(self.action_space, spaces.Discrete):
@@ -754,7 +758,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                 (
                     continue_training,
                     (pred_cheater, pred_normal),
-                    (logit_buffer, logit_mask),
+                    (penalty_buffer, penalty_mask),
                 ) = self.collect_adversarial_rollouts_policy_gradient(
                     self.env,
                     callback,
@@ -792,7 +796,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                 self._dump_logs(iteration)
 
             if method == "policy_gradient":
-                self.train_policy_gradient(logit_buffer, logit_mask)
+                self.train_policy_gradient(penalty_buffer, penalty_mask)
             elif method == "reward_shaping":
                 self.train()
 
