@@ -354,9 +354,8 @@ class ItemFarmAdversarialA2C(ItemFarmA2C):
                     pred = th.sigmoid(logit)
                     pred_buffer.append(logit)
 
-                    adv_penalty = logit.item() + np.log(
-                        1 - np.min((pred.item(), self.adv_thre))
-                    )
+                    # adv_penalty = logit.item() + np.log(1 - np.min((pred.item(), self.adv_thre)))
+                    adv_penalty = np.log(np.exp(logit.item()) + 1)
                     rewards[idx] -= self.adv_coef * adv_penalty
 
                     self.ep_adv_buffer.extend([pred.item()])

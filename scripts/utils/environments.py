@@ -25,6 +25,8 @@ def make_env(args: argparse.Namespace, **kwags) -> gym.Env:
     """
     env = BaseItemFarmEnv(
         grid_size=args.grid_size,
+        agent_start_pos=None,
+        agent_start_dir=None,
         max_steps=args.max_steps,
         see_through_walls=args.agent_view_size < 0,
         agent_view_size=args.agent_view_size,
