@@ -14,11 +14,6 @@ from .actions import ItemFarmActions
 from ..utils.tsp import parse_actions, solve_minigrid_tsp
 
 
-class AgentType(Enum):
-    PO = 1
-    FO = 2
-
-
 class BallItem(Ball):
     def can_overlap(self):
         return True
@@ -160,6 +155,9 @@ class BaseItemFarmEnv(MiniGridEnv):
             COLOR_TO_IDX["red"],
             self.agent_dir,
         )
+
+        # Add normalized partial trajectory into observation
+        image[..., 1] = self.visualize_status()["total"][0]
 
         obs["image"] = image
         if self.is_po:
