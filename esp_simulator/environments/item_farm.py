@@ -1,4 +1,3 @@
-from enum import Enum
 from typing import Any, Dict, List, SupportsFloat, Tuple
 
 from gymnasium import spaces
