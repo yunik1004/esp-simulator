@@ -16,7 +16,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
 import torch
 from torch import nn
-from torch.optim import AdamW
+from torch.optim import Adam
 
 from esp_simulator.models.item_farm import ItemFarmAntiCheater
 from esp_simulator.policies import construct_ItemFarmPolicy
@@ -123,7 +123,7 @@ def main(args: argparse.Namespace) -> None:
     classifier.to(fabric.device)
 
     optimizer_classifier = (
-        AdamW(classifier.parameters(), lr=args.lr_classifier)
+        Adam(classifier.parameters(), lr=args.lr_classifier)
         if args.train_classifier
         else None
     )

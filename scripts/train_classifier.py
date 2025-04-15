@@ -8,7 +8,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import TensorBoardLogger
 import torch
 from torch import nn
-from torch.optim import AdamW
+from torch.optim import Adam
 from torch.utils.data import DataLoader
 
 from esp_simulator.data.item_farm import ItemFarmClassificationDataset
@@ -57,7 +57,7 @@ class TrainerModel(L.LightningModule):
         return {"loss": loss}
 
     def configure_optimizers(self):
-        optimizer = AdamW(self.model.parameters(), lr=self.hparams.lr)
+        optimizer = Adam(self.model.parameters(), lr=self.hparams.lr)
         return {
             "optimizer": optimizer,
         }
