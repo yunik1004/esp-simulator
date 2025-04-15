@@ -33,6 +33,7 @@ def main(args: argparse.Namespace) -> None:
     # Manually controllable environment
     if args.checkpoint == "" and not args.optimal:
         args.interactive = True
+        args.cheater = True
         env = make_env(args)
         env.reset(seed=args.seed_env)
 
@@ -41,6 +42,9 @@ def main(args: argparse.Namespace) -> None:
 
         env.close()
         return
+
+    if args.optimal:
+        args.cheater = True
 
     # Load environment
     env = make_env(args)

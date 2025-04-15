@@ -27,8 +27,8 @@ class BaseItemFarmEnv(MiniGridEnv):
         agent_start_pos: Tuple[int, int] | None = (1, 1),
         agent_start_dir: int | None = 0,
         max_steps: int | None = None,
-        see_through_walls: bool = False,
         agent_view_size: int = 3,
+        is_cheater: bool = False,
         num_items: int = 5,
         **kwargs,
     ) -> None:
@@ -42,20 +42,13 @@ class BaseItemFarmEnv(MiniGridEnv):
         if max_steps is None or max_steps < 0:
             max_steps = 4 * grid_size**2
 
-        self.is_po = True
-        highlight = True
-        if agent_view_size < 0:
-            agent_view_size = 3
-            self.is_po = False
-            highlight = False
+        self.is_cheater = is_cheater
 
         super().__init__(
             mission_space=mission_space,
             grid_size=grid_size,
             max_steps=max_steps,
-            see_through_walls=see_through_walls,
             agent_view_size=agent_view_size,
-            highlight=highlight,
             **kwargs,
         )
 
@@ -135,12 +128,15 @@ class BaseItemFarmEnv(MiniGridEnv):
         self.log_action = []
         self.log_agent_pos = []
 
-        if self.is_po:
-            # Initialize highlight mask
-            self.highlight_mask = np.zeros(
-                (self.grid.width, self.grid.height), dtype=bool
-            )
-            self._update_highlight_mask()
+        # Initialize agent_view mask
+        self.view_mask = np.zeros((self.grid.width, self.grid.height), dtype=bool)
+
+        # Initialize highlight mask
+        self.highlight_mask = np.zeros((self.grid.width, self.grid.height), dtype=bool)
+        if self.is_cheater:
+            self.highlight_mask[:] = True
+
+        self._update_highlight_mask()
 
     def gen_obs(self):
         obs = super().gen_obs()
@@ -152,17 +148,21 @@ class BaseItemFarmEnv(MiniGridEnv):
         image[self.agent_pos] = (
             OBJECT_TO_IDX["agent"],
             COLOR_TO_IDX["red"],
-            self.agent_dir,
+            0,
         )
 
         # Add normalized partial trajectory into observation
         image[..., 1] = self.visualize_status()["total"][0]
 
-        obs["image"] = image
-        if self.is_po:
-            # Masking unseen regions
-            obs["image"][~self.highlight_mask] = (OBJECT_TO_IDX["unseen"], 0, 0)
+        # Add retrospective board
+        image[..., 2] = image[..., 0]
 
+        # Masking unseen regions
+        image[~self.view_mask, 0] = OBJECT_TO_IDX["unseen"]
+        image[~self.highlight_mask, 2] = OBJECT_TO_IDX["unseen"]
+
+        # Update observations
+        obs["image"] = image
         obs["item"] = self.num_items - self.num_items_remain
         obs["time"] = np.array([self.step_count / self.max_steps])
         return obs
@@ -170,9 +170,8 @@ class BaseItemFarmEnv(MiniGridEnv):
     def step(self, action):
         reward, terminated, truncated, info = self._step_main(action)
 
-        if self.is_po:
-            # Update highlight mask
-            self._update_highlight_mask()
+        # Update highlight mask
+        self._update_highlight_mask()
 
         # Save logs
         self.log_action.append(action)
@@ -327,6 +326,7 @@ class BaseItemFarmEnv(MiniGridEnv):
             - r_vec * (self.agent_view_size // 2)
         )
 
+        self.view_mask[:] = False
         # For each cell in the visibility mask
         for vis_j in range(0, self.agent_view_size):
             for vis_i in range(0, self.agent_view_size):
@@ -344,6 +344,7 @@ class BaseItemFarmEnv(MiniGridEnv):
 
                 # Mark this cell to be highlighted
                 self.highlight_mask[abs_i, abs_j] = True
+                self.view_mask[abs_i, abs_j] = True
 
     def get_full_render(self, highlight, tile_size):
         # Render the whole grid
