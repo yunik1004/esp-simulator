@@ -116,7 +116,9 @@ def main(args: argparse.Namespace) -> None:
 
     classifier = ItemFarmAntiCheater(grid_size=args.grid_size)
     if args.checkpoint_classifier != "":
-        checkpoint = torch.load(args.checkpoint_classifier)["state_dict"]
+        checkpoint = torch.load(args.checkpoint_classifier)
+        if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+            checkpoint = checkpoint["state_dict"]
         classifier.load_state_dict(checkpoint)
     classifier.to(fabric.device)
 
