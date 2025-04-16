@@ -99,7 +99,7 @@ def main(args: argparse.Namespace) -> None:
         model.set_parameters(args.checkpoint)
 
     args_normal = copy.deepcopy(args)
-    args_normal.agent_view_size = args_normal.agent_view_size_normal
+    args_normal.cheater = False
     vec_env_normal = make_vec_env(
         lambda: make_env(args_normal),
         n_envs=args.num_processes,
@@ -173,12 +173,6 @@ def get_args() -> argparse.Namespace:
     )
     parser.add_argument("--seed", type=int, default=0, help="random seed")
     add_argument_environment(parser)
-    parser.add_argument(
-        "--agent_view_size_normal",
-        type=int,
-        default=3,
-        help="view size of the normal agent. fully observable if < 0",
-    )
     add_argument_algorithm(parser)
     add_argument_train_agent(parser)
     parser.add_argument(
@@ -208,7 +202,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--lr_classifier",
         type=float,
-        default=1e-4,
+        default=3e-4,
         help="learning rate of the classifier",
     )
     parser.add_argument(
@@ -219,7 +213,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--method",
         type=str,
-        default="policy_gradient",
+        default="reward_shaping",
         choices=["reward_shaping", "policy_gradient"],
         help="adversarial training method",
     )
