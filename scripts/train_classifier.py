@@ -169,7 +169,7 @@ def get_args() -> argparse.Namespace:
         "--validation", action="store_true", help="perform validation only"
     )
     parser.add_argument("--seed", type=int, default=0, help="random seed")
-    parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
+    parser.add_argument("--lr", type=float, default=3e-4, help="learning rate")
     parser.add_argument(
         "--max_epochs", type=int, default=100, help="maximum number of epochs"
     )
