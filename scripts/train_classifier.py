@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 from esp_simulator.data.item_farm import ItemFarmClassificationDataset
 from esp_simulator.models.item_farm import ItemFarmAntiCheater
 
+from utils.classifiers import add_argument_classifier
 from utils.environments import add_argument_environment
 
 
@@ -23,7 +24,9 @@ class TrainerModel(L.LightningModule):
     def __init__(self, hparams: argparse.Namespace):
         super().__init__()
         self.save_hyperparameters(hparams)
-        self.model = ItemFarmAntiCheater(grid_size=self.hparams.grid_size)
+        self.model = ItemFarmAntiCheater(
+            grid_size=self.hparams.grid_size, features_dim=self.hparams.features_dim
+        )
         self.criterion = nn.BCEWithLogitsLoss()
 
     def load_checkpoint(self, checkpoint_path: str) -> None:
@@ -195,6 +198,7 @@ def get_args() -> argparse.Namespace:
         "--dataset_esp_val", type=str, help="validation dataset path of the esp user"
     )
     add_argument_environment(parser)
+    add_argument_classifier(parser)
     return parser.parse_args()
 
 

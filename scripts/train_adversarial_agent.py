@@ -23,6 +23,7 @@ from esp_simulator.policies import construct_ItemFarmPolicy
 
 from utils.agents import add_argument_train_agent
 from utils.algorithms import add_argument_algorithm
+from utils.classifiers import add_argument_classifier
 from utils.environments import add_argument_environment, make_env
 
 
@@ -114,7 +115,9 @@ def main(args: argparse.Namespace) -> None:
     if args.checkpoint_normal != "":
         model_normal.set_parameters(args_normal.checkpoint_normal)
 
-    classifier = ItemFarmAntiCheater(grid_size=args.grid_size)
+    classifier = ItemFarmAntiCheater(
+        grid_size=args.grid_size, features_dim=args.features_dim
+    )
     if args.checkpoint_classifier != "":
         checkpoint = torch.load(args.checkpoint_classifier)
         if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
@@ -147,7 +150,7 @@ def main(args: argparse.Namespace) -> None:
         )
 
     model.adversarial_learn(
-        total_timesteps=args.num_timesteps,
+        total_timesteps=args.adv_num_timesteps,
         callback=CallbackList(callbacks),
         tb_log_name=args.log_name,
         classifier=classifier,
@@ -175,6 +178,13 @@ def get_args() -> argparse.Namespace:
     add_argument_environment(parser)
     add_argument_algorithm(parser)
     add_argument_train_agent(parser)
+    add_argument_classifier(parser)
+    parser.add_argument(
+        "--adv_num_timesteps",
+        type=int,
+        default=int(4e8),
+        help="the number of timesteps in adversarial training mode",
+    )
     parser.add_argument(
         "--adv_coef", type=float, default=0.1, help="adversarial training coefficient"
     )

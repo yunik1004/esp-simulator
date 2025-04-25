@@ -111,18 +111,19 @@ class ItemFarmMultiFeaturesExtractor(BaseFeaturesExtractor):
 
 
 class ItemFarmAntiCheater(nn.Module):
-    def __init__(self, grid_size: int, features_dim: int = 64) -> None:
+    def __init__(
+        self, grid_size: int, n_input_channels: int = 2, features_dim: int = 64
+    ) -> None:
         super().__init__()
 
-        n_input_channels = 2
         input_size = (n_input_channels, grid_size, grid_size)
 
         self.cnn = nn.Sequential(
-            nn.Conv2d(n_input_channels, 16, 2),
+            nn.Conv2d(n_input_channels, features_dim // 4, 2),
             nn.ReLU(),
-            nn.Conv2d(16, 32, 2),
+            nn.Conv2d(features_dim // 4, features_dim // 2, 2),
             nn.ReLU(),
-            nn.Conv2d(32, 64, 2),
+            nn.Conv2d(features_dim // 2, features_dim, 2),
             nn.ReLU(),
             nn.Flatten(),
         )
