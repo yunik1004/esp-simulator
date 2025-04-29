@@ -28,14 +28,14 @@ def make_env(args: argparse.Namespace, **kwags) -> gym.Env:
         agent_start_pos=None,
         agent_start_dir=None,
         max_steps=args.max_steps,
-        see_through_walls=args.agent_view_size < 0,
         agent_view_size=args.agent_view_size,
+        is_cheater=args.cheater,
         num_items=args.num_items,
         render_mode="human" if args.interactive else "rgb_array",
         **kwags,
     )
     env = ImgScaleWrapper(env)
-    env = ObsSelectionWrapper(env, ["image", "item", "time"])
+    env = ObsSelectionWrapper(env, ["image", "direction", "item", "time"])
 
     env = VisualizeFinalStatusWrapper(env)
 
@@ -59,7 +59,10 @@ def add_argument_environment(parser: argparse.ArgumentParser):
         "--agent_view_size",
         type=int,
         default=3,
-        help="view size of the agent. fully observable if < 0",
+        help="view size of the non-cheater agent",
+    )
+    parser.add_argument(
+        "--cheater", action="store_true", help="activate ESP cheater mode"
     )
     parser.add_argument(
         "--num_items",
@@ -68,5 +71,5 @@ def add_argument_environment(parser: argparse.ArgumentParser):
         help="the number of items",
     )
     parser.add_argument(
-        "--interactive", action="store_true", help="enable interactive mode"
+        "--interactive", action="store_true", help="activate interactive mode"
     )
