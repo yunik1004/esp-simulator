@@ -31,6 +31,8 @@ def make_env(args: argparse.Namespace, **kwags) -> gym.Env:
         agent_view_size=args.agent_view_size,
         is_cheater=args.cheater,
         num_items=args.num_items,
+        num_walls=args.num_walls,
+        num_lavas=args.num_lavas,
         render_mode="human" if args.interactive else "rgb_array",
         **kwags,
     )
@@ -46,7 +48,7 @@ def add_argument_environment(parser: argparse.ArgumentParser):
     parser.add_argument(
         "--grid_size",
         type=int,
-        default=15,
+        default=11,
         help="grid size",
     )
     parser.add_argument(
@@ -69,6 +71,18 @@ def add_argument_environment(parser: argparse.ArgumentParser):
         type=int,
         default=5,
         help="the number of items",
+    )
+    parser.add_argument(
+        "--num_walls",
+        type=int,
+        default=10,
+        help="the number of walls",
+    )
+    parser.add_argument(
+        "--num_lavas",
+        type=int,
+        default=10,
+        help="the number of lavas",
     )
     parser.add_argument(
         "--interactive", action="store_true", help="activate interactive mode"

@@ -102,9 +102,9 @@ def main(args: argparse.Namespace) -> None:
     reward_std = np.std(rewards_list)
 
     logging.info(f"[Num Steps] Mean: {step_mean:.4f}, Std: {step_std:.4f}")
-    logging.info(
-        f"[Num Steps / Optimal Steps] Mean: {ratio_mean:.4f}, Std: {ratio_std:.4f}"
-    )
+    # logging.info(
+    #     f"[Num Steps / Optimal Steps] Mean: {ratio_mean:.4f}, Std: {ratio_std:.4f}"
+    # )
     logging.info(f"[Reward] Mean: {reward_mean:.4f}, Std: {reward_std:.4f}")
 
 

@@ -19,19 +19,20 @@ python scripts/train_agent.py [--cheater]
 
 ```bash
 python scripts/test_agent.py [--cheater] --checkpoint CHECKPOINT_PATH
-
-# Optimal agent
-python scripts/test_agent.py --optimal
 ```
 
 ### Evaluate agents
 
 ```bash
-# Partially observable agent
 python scripts/evaluate_agent.py [--cheater] --checkpoint CHECKPOINT_PATH
+```
 
-# Optimal agent
-python scripts/evaluate_agent.py --optimal
+### Behavior cloning
+
+```bash
+python scripts/bc_agent.py [--cheater] \
+        --checkpoint_normal CHECKPOINT_NORMAL_PATH \
+        --checkpoint_esp CHECKPOINT_CHEATER_PATH
 ```
 
 ## 3. Prepare base classifier
@@ -80,13 +81,13 @@ python scripts/evaluate_classifier.py \
 ## 4. Train adversarial agent
 
 ```bash
-# Train agent and classifier.
-# Remove `--train_classifier` if you don't want to train the classifier.
+# Train both agent and detector.
+# Remove `--train_classifier` if you don't want to train the detector.
 python scripts/train_adversarial_agent.py --cheater \
         --checkpoint CHECKPOINT_CHEATER_PATH \
         --checkpoint_normal CHECKPOINT_NORMAL_PATH \
         --features_dim 4 \
-        --checkpoint_classifier CHECKPOINT_CLASSIFIER_PATH \
+        --checkpoint_classifier CHECKPOINT_DETECTOR_PATH \
         --adv_coef 0.1 \
         --train_classifier
 ```

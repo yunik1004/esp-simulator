@@ -81,9 +81,9 @@ def main(args: argparse.Namespace) -> None:
 
     optimal_path = vec_env.envs[0].unwrapped.optimal_path
     optimal_actions = vec_env.envs[0].unwrapped.optimal_actions
-    logging.info(
-        f"Num items: {len(optimal_path)}, Optimal steps: {optimal_steps}, Optimal path: {optimal_path}"
-    )
+    # logging.info(
+    #     f"Num items: {len(optimal_path)}, Optimal steps: {optimal_steps}, Optimal path: {optimal_path}"
+    # )
 
     # Simulate
     total_reward = 0

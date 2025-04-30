@@ -5,7 +5,7 @@ from gymnasium.core import ActType
 from minigrid.core.constants import COLOR_TO_IDX, OBJECT_TO_IDX
 from minigrid.core.grid import Grid
 from minigrid.core.mission import MissionSpace
-from minigrid.core.world_object import Ball
+from minigrid.core.world_object import Ball, Lava, Wall
 from minigrid.minigrid_env import MiniGridEnv
 import numpy as np
 
@@ -19,23 +19,31 @@ class BallItem(Ball):
 
 
 class BaseItemFarmEnv(MiniGridEnv):
-    """Environment for simulating item farming game"""
+    """Environment for simulating item collection game"""
 
     def __init__(
         self,
-        grid_size=8,
+        grid_size=11,
         agent_start_pos: Tuple[int, int] | None = (1, 1),
         agent_start_dir: int | None = 0,
         max_steps: int | None = None,
         agent_view_size: int = 3,
         is_cheater: bool = False,
         num_items: int = 5,
+        num_walls: int = 10,
+        num_lavas: int = 10,
+        reward_item: float = 1.0,
+        reward_lava: float = -0.1,
         **kwargs,
     ) -> None:
         self.agent_start_pos = agent_start_pos
         self.agent_start_dir = agent_start_dir
         self.num_items = num_items
         self.num_items_remain = self.num_items
+        self.num_walls = num_walls
+        self.num_lavas = num_lavas
+        self.reward_item = reward_item
+        self.reward_lava = reward_lava
 
         mission_space = MissionSpace(mission_func=self._gen_mission)
 
@@ -67,6 +75,9 @@ class BaseItemFarmEnv(MiniGridEnv):
         self.observation_space["time"] = spaces.Box(
             low=0, high=1, shape=(1,), dtype=float
         )
+
+        # State
+        self.state_init = None
 
         # Items
         self.items = []
@@ -101,25 +112,38 @@ class BaseItemFarmEnv(MiniGridEnv):
         self.items = []
 
         num_grids = (width - 2) * (height - 2)
-        if num_grids < self.num_items + 1:
-            raise ValueError(f"Too many items: {self.num_items}")
+        num_elements = self.num_items + self.num_walls + self.num_lavas
+        if num_grids < num_elements + 1:
+            raise ValueError("Too many elements")
 
         lex_pos = np.arange(num_grids)
         lex_pos = np.delete(
             lex_pos, (self.agent_pos[0] - 1) + (self.agent_pos[1] - 1) * (width - 2)
         )
 
-        items_lex_pos = (
-            np.random.choice(lex_pos, self.num_items, replace=False)
+        elems_lex_pos = (
+            np.random.choice(lex_pos, num_elements, replace=False)
             if self._np_random is None
-            else self._np_random.choice(lex_pos, self.num_items, replace=False)
+            else self._np_random.choice(lex_pos, num_elements, replace=False)
         )
 
-        for lex_pos in items_lex_pos:
+        list_elems = []
+        for lex_pos in elems_lex_pos:
             w_pos = int(lex_pos % (width - 2) + 1)
             h_pos = int(lex_pos // (width - 2) + 1)
-            self.put_obj(BallItem("green"), w_pos, h_pos)
-            self.items.append((w_pos, h_pos))
+            list_elems.append((w_pos, h_pos))
+
+        edx = 0
+        for _ in range(self.num_items):
+            self.items.append(list_elems[edx])
+            self.put_obj(BallItem("green"), *list_elems[edx])
+            edx += 1
+        for _ in range(self.num_walls):
+            self.put_obj(Wall(), *list_elems[edx])
+            edx += 1
+        for _ in range(self.num_lavas):
+            self.put_obj(Lava(), *list_elems[edx])
+            edx += 1
 
         self.num_items_remain = self.num_items
         self.optimal_steps, self.optimal_path, self.optimal_actions = self.solve_tsp()
@@ -137,6 +161,8 @@ class BaseItemFarmEnv(MiniGridEnv):
             self.highlight_mask[:] = True
 
         self._update_highlight_mask()
+
+        self.state_init = self.grid.encode()[..., 0]
 
     def gen_obs(self):
         obs = super().gen_obs()
@@ -234,11 +260,14 @@ class BaseItemFarmEnv(MiniGridEnv):
             if fwd_cell is None or fwd_cell.can_overlap():
                 self.agent_pos = tuple(fwd_pos)
             if fwd_cell is not None and fwd_cell.type == "ball":
-                reward = self._reward()
+                reward = self._reward() * self.reward_item
                 self.grid.set(fwd_pos[0], fwd_pos[1], None)
                 self.num_items_remain -= 1
                 if self.num_items_remain <= 0:
                     terminated = True
+            if fwd_cell is not None and fwd_cell.type == "lava":
+                reward = self._reward() * self.reward_lava
+                self.grid.set(fwd_pos[0], fwd_pos[1], None)
 
         else:
             raise ValueError(f"Unknown action: {action}")
@@ -282,12 +311,12 @@ class BaseItemFarmEnv(MiniGridEnv):
         return optimal_cost, optimal_path_pos, optimal_actions
 
     def visualize_status(self) -> dict[str, np.ndarray]:
-        """Visualize the path history and the items by map format
+        """Visualize the path history and the initial state
 
         Returns
         -------
         dict[str, np.ndarray]
-            path, item, total
+            path, state_init, total
         """
         # Draw map of path: 1(start_pos), 2, 3, ...
         map_path = np.zeros((self.grid.width, self.grid.height), dtype=int)
@@ -295,19 +324,20 @@ class BaseItemFarmEnv(MiniGridEnv):
         for step, pos in enumerate(self.log_agent_pos, 2):
             map_path[pos] = step
 
-        # Draw map of items: 1
-        map_item = np.zeros((self.grid.width, self.grid.height), dtype=bool)
-        for pos_item in self.items:
-            map_item[pos_item] = 1
+        # Initial state
+        map_state = self.state_init.copy()
 
         # Concatenate rescaled maps
         map_total = np.stack(
-            (map_path.astype(float) / map_path.max(), map_item.astype(float))
+            (
+                map_path.astype(float) / map_path.max(),
+                map_state.astype(float) / OBJECT_TO_IDX["agent"],
+            )
         )
 
         maps = {
             "path": map_path,
-            "item": map_item,
+            "state": map_state,
             "total": map_total,
         }
         return maps
