@@ -27,12 +27,12 @@ python scripts/test_agent.py [--cheater] --checkpoint CHECKPOINT_PATH
 python scripts/evaluate_agent.py [--cheater] --checkpoint CHECKPOINT_PATH
 ```
 
-### Behavior cloning
+### Behavior cloning of Non-cheater
 
 ```bash
-python scripts/bc_agent.py [--cheater] \
+python scripts/bc_agent.py --cheater \
+        --checkpoint CHECKPOINT_CHEATER_PATH \
         --checkpoint_normal CHECKPOINT_NORMAL_PATH \
-        --checkpoint_esp CHECKPOINT_CHEATER_PATH
 ```
 
 ## 3. Prepare base classifier

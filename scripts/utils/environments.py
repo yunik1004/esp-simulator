@@ -1,4 +1,5 @@
 import argparse
+from typing import Callable, Sequence
 
 import gymnasium as gym
 
@@ -10,7 +11,11 @@ from esp_simulator.environments.wrapper import (
 )
 
 
-def make_env(args: argparse.Namespace, **kwags) -> gym.Env:
+def make_env(
+    args: argparse.Namespace,
+    post_wrappers: Sequence[Callable[[gym.Env, int], gym.Env]] | None = None,
+    **kwags,
+) -> gym.Env:
     """Make gymnasium environment
 
     Parameters
@@ -40,6 +45,10 @@ def make_env(args: argparse.Namespace, **kwags) -> gym.Env:
     env = ObsSelectionWrapper(env, ["image", "direction", "item", "time"])
 
     env = VisualizeFinalStatusWrapper(env)
+
+    if post_wrappers:
+        for wrapper in post_wrappers:
+            env = wrapper(env)
 
     return env
 

@@ -93,7 +93,6 @@ def main(args: argparse.Namespace) -> None:
         device=fabric.device,
         adversary=True,
         adv_coef=args.adv_coef,
-        adv_thre=args.adv_thre,
         cls_freq=args.cls_freq,
     )
     if args.checkpoint != "":
@@ -187,9 +186,6 @@ def get_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--adv_coef", type=float, default=0.1, help="adversarial training coefficient"
-    )
-    parser.add_argument(
-        "--adv_thre", type=float, default=0.99, help="adversarial training threshold"
     )
     parser.add_argument(
         "--cls_freq", type=int, default=1, help="classifier update frequency"

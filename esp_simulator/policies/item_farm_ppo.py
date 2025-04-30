@@ -176,14 +176,12 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
     def __init__(
         self,
         adv_coef: float = 0.0,
-        adv_thre: float = 0.99,
         cls_freq: int = 1,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.adv_coef = adv_coef
-        self.adv_thre = adv_thre
         self.cls_freq = cls_freq
         self.ep_adv_buffer = None
         self.ep_cls_buffer = None
@@ -346,7 +344,6 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                     pred = th.sigmoid(logit)
                     pred_buffer.append(logit)
 
-                    # adv_penalty = logit.item() + np.log(1 - np.min((pred.item(), self.adv_thre)))
                     adv_penalty = np.log(np.exp(logit.item()) + 1)
                     rewards[idx] -= self.adv_coef * adv_penalty
 
@@ -505,7 +502,6 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                     pred_buffer.append(logit)
                     self.ep_adv_buffer.extend([pred.item()])
 
-                    # adv_penalty = logit.item() + np.log(1 - np.min((pred.item(), self.adv_thre)))
                     adv_penalty = np.log(np.exp(logit.item()) + 1)
                     penalty_buffer[pos_prev[idx] : rollout_buffer.pos, idx] = (
                         adv_penalty
