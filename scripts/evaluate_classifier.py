@@ -38,7 +38,9 @@ class TesterModel(L.LightningModule):
         checkpoint_path : str
             Path to checkpoint
         """
-        checkpoint = torch.load(checkpoint_path)["state_dict"]
+        checkpoint = torch.load(checkpoint_path)
+        if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+            checkpoint = checkpoint["state_dict"]
         self.model.load_state_dict(checkpoint, strict=False)
 
     def test_step(self, batch, batch_idx):
