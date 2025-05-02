@@ -5,6 +5,6 @@ def add_argument_classifier(parser: argparse.ArgumentParser):
     parser.add_argument(
         "--features_dim",
         type=int,
-        default=4,
+        default=64,
         help="feature dimension of the classifier",
     )
