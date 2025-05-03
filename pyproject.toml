@@ -9,7 +9,6 @@ authors = [
 ]
 dependencies = [
     "imageio[ffmpeg]>=2.37.0",
-    "imitation>=1.0.0",
     "lightning>=2.5.0.post0",
     "minigrid>=3.0.0",
     "stable-baselines3>=2.5.0",

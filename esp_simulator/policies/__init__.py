@@ -9,7 +9,7 @@ from .item_farm_ppo import construct_ItemFarmPPO, ItemFarmPPO
 
 
 def construct_ItemFarmPolicy(
-    algorithm: str = "a2c", batch_size: int = 64, n_epochs: int = 10, *args, **kwargs
+    algorithm: str = "ppo", batch_size: int = 64, n_epochs: int = 10, *args, **kwargs
 ) -> BaseAlgorithm:
     assert algorithm in ["a2c", "ppo"]
     if algorithm == "a2c":

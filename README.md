@@ -29,14 +29,6 @@ python scripts/evaluate_agent.py [--cheater] \
         --seed_envs 12000-13999
 ```
 
-### Behavior cloning of Non-cheater
-
-```bash
-python scripts/bc_agent.py --cheater \
-        --checkpoint CHECKPOINT_CHEATER_PATH \
-        --checkpoint_normal CHECKPOINT_NORMAL_PATH \
-```
-
 ## 3. Prepare base classifier
 
 ### Generate data for classifier
