@@ -6,10 +6,11 @@ import logging
 from lightning.fabric import Fabric
 import numpy as np
 from stable_baselines3.common.env_util import make_vec_env
-from tqdm import trange
+from tqdm import tqdm
 
 from esp_simulator.environments.actions import ItemFarmActions
 from esp_simulator.policies import load_ItemFarmPolicy
+from esp_simulator.utils.parser import parse_str2intlist
 from esp_simulator.utils.vec_env import EvaluateVecEnv
 
 from utils.algorithms import add_argument_algorithm
@@ -47,7 +48,7 @@ def main(args: argparse.Namespace) -> None:
     steps_list = np.array([], dtype=int)
     steps_ratio_list = np.array([])
     rewards_list = np.array([])
-    for seed_env in trange(args.num_envs):
+    for seed_env in tqdm(args.seed_envs):
         if model is not None:
             model.set_random_seed(args.seed)
         vec_env.seed(seed_env)
@@ -125,15 +126,15 @@ def get_args() -> argparse.Namespace:
         "--checkpoint", type=str, default="", help="checkpoint of the model"
     )
     parser.add_argument(
-        "--num_envs",
-        type=int,
-        default=100,
-        help="the number of environments",
+        "--seed_envs",
+        type=str,
+        default="12000-13999",
+        help="list of random seeds for environment",
     )
     parser.add_argument(
         "--num_repeats",
         type=int,
-        default=5,
+        default=1,
         help="the number of repetitions",
     )
     parser.add_argument("--seed", type=int, default=0, help="random seed")
@@ -144,4 +145,5 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     opts = get_args()
+    opts.seed_envs = parse_str2intlist(opts.seed_envs)
     main(opts)

@@ -12,7 +12,7 @@ uv pip install .
 ### Train agents
 
 ```bash
-python scripts/train_agent.py [--cheater]
+python scripts/train_agent.py [--cheater] --seed 0
 ```
 
 ### Test agents
@@ -24,7 +24,9 @@ python scripts/test_agent.py [--cheater] --checkpoint CHECKPOINT_PATH
 ### Evaluate agents
 
 ```bash
-python scripts/evaluate_agent.py [--cheater] --checkpoint CHECKPOINT_PATH
+python scripts/evaluate_agent.py [--cheater] \
+        --checkpoint CHECKPOINT_PATH \
+        --seed_envs 12000-13999
 ```
 
 ### Behavior cloning of Non-cheater
