@@ -2,16 +2,20 @@
 
 import argparse
 import copy
+import os
 
-from imitation.algorithms import bc
 from imitation.data import rollout
 from imitation.data.wrappers import RolloutInfoWrapper
+from imitation.util import logger
 from lightning.fabric import Fabric
 from lightning.pytorch import seed_everything
+import numpy as np
 from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.utils import get_latest_run_id
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
 from esp_simulator.policies import construct_ItemFarmPolicy
+from esp_simulator.utils import bc
 
 from utils.agents import add_argument_train_agent
 from utils.algorithms import add_argument_algorithm
@@ -57,23 +61,38 @@ def main(args: argparse.Namespace) -> None:
     if args.checkpoint_normal != "":
         model_normal.set_parameters(args_normal.checkpoint_normal)
 
-    rollouts = rollout.rollout(
-        model_normal,
-        vec_env_normal,
-        rollout.make_sample_until(min_episodes=50),
-    )
-    transitions = rollout.flatten_trajectories(rollouts)
+    last_run_id = get_latest_run_id(log_path=args.log_dir, log_name=args.log_name)
+    log_dir_actual = os.path.join(args.log_dir, f"{args.log_name}_{last_run_id + 1}")
+    bc_logger = logger.configure(log_dir_actual, ["stdout", "tensorboard"])
 
-    bc_trainer = bc.BC(
+    bc_trainer = bc.BCWithValue(
         observation_space=vec_env.observation_space,
         action_space=vec_env.action_space,
-        policy=model,
-        demonstrations=transitions,
+        rng=np.random.default_rng(seed=args.seed),
+        policy=model.policy,
+        device=fabric.device,
+        custom_logger=bc_logger,
     )
 
-    bc_trainer.train(
-        n_epochs=1,
-    )
+    batch_num, num_samples_so_far = 0, 0
+    for epoch in range(args.num_bc_epochs):
+        rollouts = bc.rollout_cheater(
+            model_normal,
+            vec_env_normal,
+            rollout.make_sample_until(min_episodes=args.rollout_episodes),
+            rng=np.random.default_rng(),
+        )
+        transitions = rollout.flatten_trajectories(rollouts)
+        bc_trainer.set_demonstrations(transitions)
+
+        batch_num, num_samples_so_far = bc_trainer.train(
+            epoch_start=epoch,
+            batch_num_start=batch_num,
+            num_samples_so_far_start=num_samples_so_far,
+            n_epochs=1,
+        )
+        num_step = bc_trainer._bc_logger._tensorboard_step - 1
+        model.save(os.path.join(log_dir_actual, f"rl_model_{num_step}_steps.zip"))
 
 
 def get_args() -> argparse.Namespace:
@@ -89,6 +108,24 @@ def get_args() -> argparse.Namespace:
         "--accelerator", type=str, default="auto", help="training accelerator"
     )
     parser.add_argument("--seed", type=int, default=0, help="random seed")
+    parser.add_argument(
+        "--num_bc_epochs",
+        type=int,
+        default=int(1e4),
+        help="the number of bc epochs",
+    )
+    parser.add_argument(
+        "--rollout_episodes",
+        type=int,
+        default=8192,
+        help="the number of rollout episodes per epoch",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        default="",
+        help="checkpoint of the model",
+    )
     parser.add_argument(
         "--checkpoint_normal",
         type=str,

@@ -15,6 +15,14 @@ uv pip install .
 python scripts/train_agent.py [--cheater] --seed 0
 ```
 
+### Behavior cloning agents
+
+```bash
+python scripts/bc_agent.py \
+        --checkpoint CHECKPOINT_PATH \
+        --checkpoint_normal CHECKPOINT_NORMAL_PATH
+```
+
 ### Test agents
 
 ```bash

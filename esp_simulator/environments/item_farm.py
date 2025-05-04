@@ -68,7 +68,7 @@ class BaseItemFarmEnv(MiniGridEnv):
         self.observation_space["image"] = spaces.Box(
             low=0,
             high=255,
-            shape=(self.grid.width, self.grid.height, 3),
+            shape=(3, self.grid.width, self.grid.height),
             dtype="uint8",
         )
         self.observation_space["item"] = spaces.Discrete(self.num_items)
@@ -78,6 +78,7 @@ class BaseItemFarmEnv(MiniGridEnv):
 
         # State
         self.state_init = None
+        self.grid_curr = None
 
         # Items
         self.items = []
@@ -163,6 +164,7 @@ class BaseItemFarmEnv(MiniGridEnv):
         self._update_highlight_mask()
 
         self.state_init = self.grid.encode()[..., 0]
+        self.grid_curr = None
 
     def gen_obs(self):
         obs = super().gen_obs()
@@ -183,12 +185,14 @@ class BaseItemFarmEnv(MiniGridEnv):
         # Add retrospective board
         image[..., 2] = image[..., 0]
 
+        self.grid_curr = image[..., 0].copy()
+
         # Masking unseen regions
         image[~self.view_mask, 0] = OBJECT_TO_IDX["unseen"]
         image[~self.highlight_mask, 2] = OBJECT_TO_IDX["unseen"]
 
         # Update observations
-        obs["image"] = image
+        obs["image"] = np.transpose(image, (2, 0, 1))
         obs["item"] = self.num_items - self.num_items_remain
         obs["time"] = np.array([self.step_count / self.max_steps])
         return obs
@@ -235,7 +239,7 @@ class BaseItemFarmEnv(MiniGridEnv):
         """
         self.step_count += 1
 
-        reward = 0
+        reward = 0.0
         terminated = False
         truncated = False
 
