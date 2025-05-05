@@ -41,6 +41,50 @@ from torchmetrics import AUROC, AveragePrecision
 from ..models.item_farm import ItemFarmMultiFeaturesExtractor
 
 
+def extract_obs_space_cheater(observation_space: spaces.Dict) -> spaces.Dict:
+    spaces_dict = {}
+    for key, val in observation_space.spaces.items():
+        if key == "image":
+            continue
+        elif key == "image_cheater":
+            spaces_dict["image"] = val
+        else:
+            spaces_dict[key] = val
+    return spaces.Dict(spaces_dict)
+
+
+def extract_obs_space_noncheater(observation_space: spaces.Dict) -> spaces.Dict:
+    spaces_dict = {}
+    for key, val in observation_space.spaces.items():
+        if key == "image_cheater":
+            continue
+        else:
+            spaces_dict[key] = val
+    return spaces.Dict(spaces_dict)
+
+
+def extract_obs_cheater(obs: PyTorchObs) -> PyTorchObs:
+    obs_new = {}
+    for key, val in obs.items():
+        if key == "image":
+            continue
+        elif key == "image_cheater":
+            obs_new["image"] = val
+        else:
+            obs_new[key] = val
+    return obs_new
+
+
+def extract_obs_noncheater(obs: PyTorchObs) -> PyTorchObs:
+    obs_new = {}
+    for key, val in obs.items():
+        if key == "image_cheater":
+            continue
+        else:
+            obs_new[key] = val
+    return obs_new
+
+
 class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
     def __init__(
         self,
@@ -152,14 +196,14 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
         self.policy_nc_kwargs = policy_nc_kwargs
 
         self.policy_c = self.policy_c_class(
-            self.observation_space,
+            extract_obs_space_cheater(self.observation_space),
             self.action_space,
             lr_schedule,
             use_sde=self.use_sde,
             **self.policy_c_kwargs,
         )
         self.policy_nc = self.policy_nc_class(
-            self.observation_space,
+            extract_obs_space_noncheater(self.observation_space),
             self.action_space,
             lr_schedule,
             use_sde=self.use_sde,
@@ -210,7 +254,7 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
         )  # type: ignore[call-arg]
 
     def forward(
-        self, obs: th.Tensor, deterministic: bool = False
+        self, obs: PyTorchObs, deterministic: bool = False
     ) -> tuple[th.Tensor, th.Tensor, th.Tensor]:
         """
         Forward pass in all the networks (actor and critic)
@@ -219,9 +263,12 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
         :param deterministic: Whether to sample or use deterministic actions
         :return: action, value and log probability of the action
         """
+        obs_c = extract_obs_cheater(obs)
+        obs_nc = extract_obs_noncheater(obs)
+
         with th.no_grad():
             # Cheater
-            features_c = self.policy_c.extract_features(obs)
+            features_c = self.policy_c.extract_features(obs_c)
             if self.policy_c.share_features_extractor:
                 latent_pi_c, latent_vf_c = self.policy_c.mlp_extractor(features_c)
             else:
@@ -232,7 +279,7 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
             distribution_c = self.policy_c._get_action_dist_from_latent(latent_pi_c)
 
             # Non-cheater
-            distribution_nc = self.policy_nc.get_distribution(obs)
+            distribution_nc = self.policy_nc.get_distribution(obs_nc)
 
         assert isinstance(distribution_c, CategoricalDistribution)
         assert isinstance(distribution_nc, CategoricalDistribution)
@@ -267,9 +314,12 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
         :return: estimated value, log likelihood of taking those actions
             and entropy of the action distribution.
         """
+        obs_c = extract_obs_cheater(obs)
+        obs_nc = extract_obs_noncheater(obs)
+
         with th.no_grad():
             # Cheater
-            features_c = self.policy_c.extract_features(obs)
+            features_c = self.policy_c.extract_features(obs_c)
             if self.policy_c.share_features_extractor:
                 latent_pi_c, latent_vf_c = self.policy_c.mlp_extractor(features_c)
             else:
@@ -280,7 +330,7 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
             distribution_c = self.policy_c._get_action_dist_from_latent(latent_pi_c)
 
             # Non-cheater
-            distribution_nc = self.policy_nc.get_distribution(obs)
+            distribution_nc = self.policy_nc.get_distribution(obs_nc)
 
         assert isinstance(distribution_c, CategoricalDistribution)
         assert isinstance(distribution_nc, CategoricalDistribution)
@@ -309,11 +359,14 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
         :param obs:
         :return: the action distribution.
         """
+        obs_c = extract_obs_cheater(obs)
+        obs_nc = extract_obs_noncheater(obs)
+
         with th.no_grad():
             # Cheater
-            distribution_c = self.policy_c.get_distribution(obs)
+            distribution_c = self.policy_c.get_distribution(obs_c)
             # Non-cheater
-            distribution_nc = self.policy_nc.get_distribution(obs)
+            distribution_nc = self.policy_nc.get_distribution(obs_nc)
 
         assert isinstance(distribution_c, CategoricalDistribution)
         assert isinstance(distribution_nc, CategoricalDistribution)
@@ -339,7 +392,8 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
         :param obs: Observation
         :return: the estimated values.
         """
-        return self.policy_c.predict_values(obs)
+        obs_c = extract_obs_cheater(obs)
+        return self.policy_c.predict_values(obs_c)
 
     def set_training_mode(self, mode: bool) -> None:
         """

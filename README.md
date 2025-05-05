@@ -18,13 +18,13 @@ python scripts/train_agent.py [--cheater] --seed 0
 ### Test agents
 
 ```bash
-python scripts/test_agent.py [--cheater] --checkpoint CHECKPOINT_PATH
+python scripts/test_agent.py [--cheater | --mixed] --checkpoint CHECKPOINT_PATH
 ```
 
 ### Evaluate agents
 
 ```bash
-python scripts/evaluate_agent.py [--cheater] \
+python scripts/evaluate_agent.py [--cheater | --mixed] \
         --checkpoint CHECKPOINT_PATH \
         --seed_envs 12000-13999
 ```
@@ -43,17 +43,17 @@ python scripts/construct_mixed_agent.py \
 
 ```bash
 ## Train
-python scripts/gendata_classifier.py [--cheater] \
+python scripts/gendata_classifier.py [--cheater | --mixed] \
         --checkpoint CHECKPOINT_PATH \
         --seed_envs 0-9999 \
         --output_path ./output/train_data.npy
 ## Val
-python scripts/gendata_classifier.py [--cheater] \
+python scripts/gendata_classifier.py [--cheater | --mixed] \
         --checkpoint CHECKPOINT_PATH \
         --seed_envs 10000-11999 \
         --output_path ./output/val_data.npy
 ## Test
-python scripts/gendata_classifier.py [--cheater] \
+python scripts/gendata_classifier.py [--cheater | --mixed] \
         --checkpoint CHECKPOINT_PATH \
         --seed_envs 12000-13999 \
         --output_path ./output/test_data.npy
@@ -84,7 +84,7 @@ python scripts/evaluate_classifier.py \
 
 ```bash
 # Remove `--train_classifier` if you don't want to train the detector.
-python scripts/train_adversarial_agent.py --cheater \
+python scripts/train_adversarial_agent.py --mixed \
         --checkpoint CHECKPOINT_CHEATER_PATH \
         --checkpoint_normal CHECKPOINT_NORMAL_PATH \
         --features_dim 4 \

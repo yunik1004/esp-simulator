@@ -63,9 +63,18 @@ def main(args: argparse.Namespace) -> None:
     if args.checkpoint_normal != "":
         model_normal.set_parameters(args_normal.checkpoint_normal)
 
+    args_mixed = copy.deepcopy(args_normal)
+    args_mixed.mixed = True
+    vec_env_mixed = make_vec_env(
+        lambda: make_env(args_mixed),
+        n_envs=args.num_processes,
+        seed=args.seed,
+        vec_env_cls=SubprocVecEnv,
+    )
+
     model_mixed = construct_MixedItemFarmPolicy(
         algorithm=args.algo,
-        env=vec_env,
+        env=vec_env_mixed,
         device=fabric.device,
     )
     model_mixed.policy.policy_c = model.policy
@@ -73,6 +82,7 @@ def main(args: argparse.Namespace) -> None:
 
     last_run_id = get_latest_run_id(log_path=args.log_dir, log_name=args.log_name)
     log_dir_actual = os.path.join(args.log_dir, f"{args.log_name}_{last_run_id + 1}")
+    os.makedirs(log_dir_actual, exist_ok=True)
 
     model_mixed.save(os.path.join(log_dir_actual, f"rl_model_mixed.zip"))
 

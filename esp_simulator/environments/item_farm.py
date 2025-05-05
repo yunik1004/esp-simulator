@@ -29,6 +29,7 @@ class BaseItemFarmEnv(MiniGridEnv):
         max_steps: int | None = None,
         agent_view_size: int = 3,
         is_cheater: bool = False,
+        is_mixed: bool = False,
         num_items: int = 5,
         num_walls: int = 10,
         num_lavas: int = 10,
@@ -51,6 +52,7 @@ class BaseItemFarmEnv(MiniGridEnv):
             max_steps = 4 * grid_size**2
 
         self.is_cheater = is_cheater
+        self.is_mixed = is_mixed
 
         super().__init__(
             mission_space=mission_space,
@@ -75,6 +77,13 @@ class BaseItemFarmEnv(MiniGridEnv):
         self.observation_space["time"] = spaces.Box(
             low=0, high=1, shape=(1,), dtype=float
         )
+        if self.is_mixed:
+            self.observation_space["image_cheater"] = spaces.Box(
+                low=0,
+                high=255,
+                shape=(3, self.grid.width, self.grid.height),
+                dtype="uint8",
+            )
 
         # State
         self.state_init = None
@@ -189,12 +198,15 @@ class BaseItemFarmEnv(MiniGridEnv):
 
         # Masking unseen regions
         image[~self.view_mask, 0] = OBJECT_TO_IDX["unseen"]
-        image[~self.highlight_mask, 2] = OBJECT_TO_IDX["unseen"]
+        image_main = image.copy()
+        image_main[~self.highlight_mask, 2] = OBJECT_TO_IDX["unseen"]
 
         # Update observations
-        obs["image"] = np.transpose(image, (2, 0, 1))
+        obs["image"] = np.transpose(image_main, (2, 0, 1))
         obs["item"] = self.num_items - self.num_items_remain
         obs["time"] = np.array([self.step_count / self.max_steps])
+        if self.is_mixed:
+            obs["image_cheater"] = np.transpose(image, (2, 0, 1))
         return obs
 
     def step(self, action):

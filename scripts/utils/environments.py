@@ -35,6 +35,7 @@ def make_env(
         max_steps=args.max_steps,
         agent_view_size=args.agent_view_size,
         is_cheater=args.cheater,
+        is_mixed=args.mixed,
         num_items=args.num_items,
         num_walls=args.num_walls,
         num_lavas=args.num_lavas,
@@ -42,7 +43,11 @@ def make_env(
         **kwags,
     )
     env = ImgScaleWrapper(env)
-    env = ObsSelectionWrapper(env, ["image", "direction", "item", "time"])
+
+    obs_keys = ["image", "direction", "item", "time"]
+    if args.mixed:
+        obs_keys.append("image_cheater")
+    env = ObsSelectionWrapper(env, obs_keys)
 
     env = VisualizeFinalStatusWrapper(env)
 
@@ -72,9 +77,15 @@ def add_argument_environment(parser: argparse.ArgumentParser):
         default=3,
         help="view size of the non-cheater agent",
     )
-    parser.add_argument(
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
         "--cheater", action="store_true", help="activate ESP cheater mode"
     )
+    group.add_argument(
+        "--mixed", action="store_true", help="activate mixed strategy mode"
+    )
+
     parser.add_argument(
         "--num_items",
         type=int,

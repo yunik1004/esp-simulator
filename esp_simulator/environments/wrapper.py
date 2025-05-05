@@ -37,6 +37,8 @@ class ImgScaleWrapper(ObservationWrapper):
         obs["image"] = obs["image"] * self.scale
         if "image_full" in obs:
             obs["image_full"] = obs["image_full"] * self.scale
+        if "image_cheater" in obs:
+            obs["image_cheater"] = obs["image_cheater"] * self.scale
         return obs
 
 
