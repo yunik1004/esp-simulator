@@ -290,7 +290,7 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
         features = self.extract_features(obs, self.vf_features_extractor)
         latent_vf = self.mlp_extractor.forward_critic(features)
         values = self.value_net(latent_vf)
-        weight = logits_to_probs(values)
+        weight = logits_to_probs(values, is_binary=True)
 
         probs = weight * probs_c + (1 - weight) * probs_nc
         logits = probs_to_logits(probs)
@@ -341,7 +341,7 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
         features = self.extract_features(obs, self.vf_features_extractor)
         latent_vf = self.mlp_extractor.forward_critic(features)
         values = self.value_net(latent_vf)
-        weight = logits_to_probs(values)
+        weight = logits_to_probs(values, is_binary=True)
 
         probs = weight * probs_c + (1 - weight) * probs_nc
         logits = probs_to_logits(probs)
@@ -377,7 +377,7 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
         features = self.extract_features(obs, self.vf_features_extractor)
         latent_vf = self.mlp_extractor.forward_critic(features)
         values = self.value_net(latent_vf)
-        weight = logits_to_probs(values)
+        weight = logits_to_probs(values, is_binary=True)
 
         probs = weight * probs_c + (1 - weight) * probs_nc
         logits = probs_to_logits(probs)
