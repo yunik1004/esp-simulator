@@ -5,7 +5,11 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 import torch
 
 from .item_farm_a2c import construct_ItemFarmA2C, ItemFarmA2C
-from .item_farm_ppo import construct_ItemFarmPPO, ItemFarmPPO
+from .item_farm_ppo import (
+    construct_ItemFarmPPO,
+    construct_MixedItemFarmPPO,
+    ItemFarmPPO,
+)
 
 
 def construct_ItemFarmPolicy(
@@ -30,3 +34,13 @@ def load_ItemFarmPolicy(
         return ItemFarmA2C.load(path, device=device)
     elif algorithm == "ppo":
         return ItemFarmPPO.load(path, device=device)
+
+
+def construct_MixedItemFarmPolicy(
+    algorithm: str = "ppo", batch_size: int = 64, n_epochs: int = 10, *args, **kwargs
+) -> BaseAlgorithm:
+    assert algorithm in ["ppo"]
+    if algorithm == "ppo":
+        return construct_MixedItemFarmPPO(
+            batch_size=batch_size, n_epochs=n_epochs, *args, **kwargs
+        )

@@ -159,6 +159,7 @@ def main(args: argparse.Namespace) -> None:
     )
 
     vec_env.close()
+    vec_env_normal.close()
 
 
 def get_args() -> argparse.Namespace:

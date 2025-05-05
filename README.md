@@ -15,14 +15,6 @@ uv pip install .
 python scripts/train_agent.py [--cheater] --seed 0
 ```
 
-### Behavior cloning agents
-
-```bash
-python scripts/bc_agent.py \
-        --checkpoint CHECKPOINT_PATH \
-        --checkpoint_normal CHECKPOINT_NORMAL_PATH
-```
-
 ### Test agents
 
 ```bash
@@ -37,7 +29,15 @@ python scripts/evaluate_agent.py [--cheater] \
         --seed_envs 12000-13999
 ```
 
-## 3. Prepare base classifier
+## 3. Prepare mixed agents
+
+```bash
+python scripts/construct_mixed_agent.py \
+        --checkpoint CHECKPOINT_CHEATER_PATH \
+        --checkpoint_normal CHECKPOINT_NORMAL_PATH
+```
+
+## 4. Prepare base classifier
 
 ### Generate data for classifier
 
@@ -80,10 +80,9 @@ python scripts/evaluate_classifier.py \
         --dataset_esp ./output/test_cheater.npy
 ```
 
-## 4. Train adversarial agent
+## 5. Train adversarial agent
 
 ```bash
-# Train both agent and detector.
 # Remove `--train_classifier` if you don't want to train the detector.
 python scripts/train_adversarial_agent.py --cheater \
         --checkpoint CHECKPOINT_CHEATER_PATH \
