@@ -19,7 +19,7 @@ from torch import nn
 from torch.optim import Adam
 
 from esp_simulator.models.item_farm import ItemFarmAntiCheater
-from esp_simulator.policies import construct_ItemFarmPolicy
+from esp_simulator.policies import construct_ItemFarmPolicy, construct_MixedItemFarmPolicy
 
 from utils.agents import add_argument_train_agent
 from utils.algorithms import add_argument_algorithm
@@ -79,7 +79,11 @@ def main(args: argparse.Namespace) -> None:
         vec_env_cls=SubprocVecEnv,
     )
 
-    model = construct_ItemFarmPolicy(
+    constructor_fn = construct_ItemFarmPolicy
+    if args.mixed:
+        constructor_fn = construct_MixedItemFarmPolicy
+
+    model = constructor_fn(
         algorithm=args.algo,
         env=vec_env,
         learning_rate=args.lr,
@@ -100,6 +104,7 @@ def main(args: argparse.Namespace) -> None:
 
     args_normal = copy.deepcopy(args)
     args_normal.cheater = False
+    args_normal.mixed = False
     vec_env_normal = make_vec_env(
         lambda: make_env(args_normal),
         n_envs=args.num_processes,
