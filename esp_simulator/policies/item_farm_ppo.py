@@ -1,6 +1,7 @@
 from collections import deque
 from collections.abc import Generator
 from functools import partial
+import statistics
 from typing import Any, List, Optional, Union
 import warnings
 
@@ -10,8 +11,12 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.distributions import (
+    BernoulliDistribution,
     CategoricalDistribution,
+    DiagGaussianDistribution,
     Distribution,
+    MultiCategoricalDistribution,
+    StateDependentNoiseDistribution,
     make_proba_distribution,
 )
 from stable_baselines3.common.policies import (
@@ -36,6 +41,7 @@ import torch as th
 from torch import nn
 from torch.distributions.utils import logits_to_probs, probs_to_logits
 from torch.nn import functional as F
+from torch.utils.data import DataLoader, TensorDataset
 from torchmetrics import AUROC, AveragePrecision
 
 from ..models.item_farm import ItemFarmMultiFeaturesExtractor
@@ -229,6 +235,32 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
 
         self._build_mlp_extractor()
 
+        latent_dim_pi = self.mlp_extractor.latent_dim_pi
+
+        if isinstance(self.action_dist, DiagGaussianDistribution):
+            self.action_net, self.log_std = self.action_dist.proba_distribution_net(
+                latent_dim=latent_dim_pi, log_std_init=self.log_std_init
+            )
+        elif isinstance(self.action_dist, StateDependentNoiseDistribution):
+            self.action_net, self.log_std = self.action_dist.proba_distribution_net(
+                latent_dim=latent_dim_pi,
+                latent_sde_dim=latent_dim_pi,
+                log_std_init=self.log_std_init,
+            )
+        elif isinstance(
+            self.action_dist,
+            (
+                CategoricalDistribution,
+                MultiCategoricalDistribution,
+                BernoulliDistribution,
+            ),
+        ):
+            self.action_net = self.action_dist.proba_distribution_net(
+                latent_dim=latent_dim_pi
+            )
+        else:
+            raise NotImplementedError(f"Unsupported distribution '{self.action_dist}'.")
+
         self.value_net = nn.Linear(self.mlp_extractor.latent_dim_vf, 1)
         # Init weights: use orthogonal initialization
         # with small initial weight for the output
@@ -240,8 +272,15 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
             module_gains = {
                 self.features_extractor: np.sqrt(2),
                 self.mlp_extractor: np.sqrt(2),
+                self.action_net: 0.01,
                 self.value_net: 1,
             }
+            if not self.share_features_extractor:
+                # Note(antonin): this is to keep SB3 results
+                # consistent, see GH#1148
+                del module_gains[self.features_extractor]
+                module_gains[self.pi_features_extractor] = np.sqrt(2)
+                module_gains[self.vf_features_extractor] = np.sqrt(2)
 
             for module, gain in module_gains.items():
                 module.apply(partial(self.init_weights, gain=gain))
@@ -287,11 +326,17 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
         probs_c = distribution_c.distribution.probs
         probs_nc = distribution_nc.distribution.probs
 
-        features = self.extract_features(obs, self.vf_features_extractor)
-        latent_vf = self.mlp_extractor.forward_critic(features)
-        values = self.value_net(latent_vf)
-        weight = logits_to_probs(values, is_binary=True)
+        features = self.extract_features(obs)
+        if self.share_features_extractor:
+            latent_pi, latent_vf = self.mlp_extractor(features)
+        else:
+            pi_features, vf_features = features
+            latent_pi = self.mlp_extractor.forward_actor(pi_features)
+            latent_vf = self.mlp_extractor.forward_critic(vf_features)
+        values_delta = self.value_net(latent_vf)
+        values = values_c + values_delta
 
+        weight = logits_to_probs(self.action_net(latent_pi))[:, :1]
         probs = weight * probs_c + (1 - weight) * probs_nc
         logits = probs_to_logits(probs)
 
@@ -300,7 +345,7 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
         log_prob = distribution.log_prob(actions)
         actions = actions.reshape((-1, *self.action_space.shape))  # type: ignore[misc]
 
-        return actions, values_c, log_prob
+        return actions, values, log_prob
 
     def evaluate_actions(
         self, obs: PyTorchObs, actions: th.Tensor
@@ -338,11 +383,17 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
         probs_c = distribution_c.distribution.probs
         probs_nc = distribution_nc.distribution.probs
 
-        features = self.extract_features(obs, self.vf_features_extractor)
-        latent_vf = self.mlp_extractor.forward_critic(features)
-        values = self.value_net(latent_vf)
-        weight = logits_to_probs(values, is_binary=True)
+        features = self.extract_features(obs)
+        if self.share_features_extractor:
+            latent_pi, latent_vf = self.mlp_extractor(features)
+        else:
+            pi_features, vf_features = features
+            latent_pi = self.mlp_extractor.forward_actor(pi_features)
+            latent_vf = self.mlp_extractor.forward_critic(vf_features)
+        values_delta = self.value_net(latent_vf)
+        values = values_c + values_delta
 
+        weight = logits_to_probs(self.action_net(latent_pi))[:, :1]
         probs = weight * probs_c + (1 - weight) * probs_nc
         logits = probs_to_logits(probs)
 
@@ -350,7 +401,7 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
         log_prob = distribution.log_prob(actions)
         entropy = distribution.entropy()
 
-        return values_c, log_prob, entropy
+        return values, log_prob, entropy
 
     def get_distribution(self, obs: PyTorchObs) -> Distribution:
         """
@@ -374,11 +425,10 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
         probs_c = distribution_c.distribution.probs
         probs_nc = distribution_nc.distribution.probs
 
-        features = self.extract_features(obs, self.vf_features_extractor)
-        latent_vf = self.mlp_extractor.forward_critic(features)
-        values = self.value_net(latent_vf)
-        weight = logits_to_probs(values, is_binary=True)
+        features = self.extract_features(obs, self.pi_features_extractor)
+        latent_pi = self.mlp_extractor.forward_actor(features)
 
+        weight = logits_to_probs(self.action_net(latent_pi))[:, :1]
         probs = weight * probs_c + (1 - weight) * probs_nc
         logits = probs_to_logits(probs)
 
@@ -393,7 +443,15 @@ class ItemFarmMixedPolicy(MultiInputActorCriticPolicy):
         :return: the estimated values.
         """
         obs_c = extract_obs_cheater(obs)
-        return self.policy_c.predict_values(obs_c)
+        values_c = self.policy_c.predict_values(obs_c)
+
+        features = self.extract_features(obs, self.vf_features_extractor)
+        latent_vf = self.mlp_extractor.forward_actor(features)
+
+        values_delta = self.value_net(latent_vf)
+        values = values_c + values_delta
+
+        return values
 
     def set_training_mode(self, mode: bool) -> None:
         """
@@ -567,12 +625,16 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         self,
         adv_coef: float = 0.0,
         cls_freq: int = 1,
+        cls_epoch: int = 1,
+        cls_batch_size: int = 8,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.adv_coef = adv_coef
         self.cls_freq = cls_freq
+        self.cls_epoch = cls_epoch
+        self.cls_batch_size = cls_batch_size
         self.ep_adv_buffer = None
         self.ep_cls_buffer = None
         self.ep_auroc_buffer = None
@@ -633,7 +695,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         classifier: nn.Module,
         agent_normal: PPO,
         train_classifier: bool,
-    ) -> tuple[bool, tuple[th.Tensor, th.Tensor]]:
+    ) -> tuple[bool, tuple[th.Tensor, th.Tensor], tuple[th.Tensor, th.Tensor]]:
         """
         Collect experiences using the current policy and fill a ``RolloutBuffer``.
         The term rollout here refers to the model-free notion and should not
@@ -650,8 +712,11 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         assert self._last_obs is not None, "No previous observation was provided"
         # Switch to eval mode (this affects batch norm / dropout)
         self.policy.set_training_mode(False)
+        classifier.eval()
 
         pred_buffer = []
+        data_cheater = []
+        data_normal = []
 
         n_steps = 0
         rollout_buffer.reset()
@@ -726,11 +791,9 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                     # Adversarial reward
                     map = infos[idx]["visual_status"]
                     map = th.tensor(map, device=self.device).float().unsqueeze(0)
-                    if train_classifier:
+                    data_cheater.append(map)
+                    with th.no_grad():
                         logit = classifier(map)
-                    else:
-                        with th.no_grad():
-                            logit = classifier(map)
                     pred = th.sigmoid(logit)
                     pred_buffer.append(logit)
 
@@ -758,6 +821,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
             env=agent_normal.env,
             batch_size=batch_size,
         )
+        data_normal.append(vis_normal)
         pred_normal = classifier(vis_normal)
 
         with th.no_grad():
@@ -770,7 +834,10 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
 
         callback.on_rollout_end()
 
-        return True, (pred_cheater, pred_normal)
+        data_cheater = th.cat(data_cheater)
+        data_normal = th.cat(data_normal)
+
+        return True, (pred_cheater, pred_normal), (data_cheater, data_normal)
 
     def collect_adversarial_rollouts_policy_gradient(
         self,
@@ -1106,11 +1173,8 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         assert agent_normal is not None
         assert method in ["policy_gradient", "reward_shaping"]
         train_classifier = optimizer_classifier is not None
-        if train_classifier:
-            classifier.train()
-            criterion = nn.BCEWithLogitsLoss()
-        else:
-            classifier.eval()
+
+        criterion = nn.BCEWithLogitsLoss()
 
         agent_normal._setup_learn(
             total_timesteps,
@@ -1135,9 +1199,6 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         assert self.env is not None
 
         while self.num_timesteps < total_timesteps:
-            if train_classifier:
-                optimizer_classifier.zero_grad()
-
             if method == "policy_gradient":
                 (
                     continue_training,
@@ -1153,16 +1214,18 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                     train_classifier=train_classifier,
                 )
             elif method == "reward_shaping":
-                continue_training, (pred_cheater, pred_normal) = (
-                    self.collect_adversarial_rollouts_reward_shaping(
-                        self.env,
-                        callback,
-                        self.rollout_buffer,
-                        n_rollout_steps=self.n_steps,
-                        classifier=classifier,
-                        agent_normal=agent_normal,
-                        train_classifier=train_classifier,
-                    )
+                (
+                    continue_training,
+                    (pred_cheater, pred_normal),
+                    (data_cheater, data_normal),
+                ) = self.collect_adversarial_rollouts_reward_shaping(
+                    self.env,
+                    callback,
+                    self.rollout_buffer,
+                    n_rollout_steps=self.n_steps,
+                    classifier=classifier,
+                    agent_normal=agent_normal,
+                    train_classifier=train_classifier,
                 )
 
             if not continue_training:
@@ -1203,13 +1266,34 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
             self.ep_ap_buffer.extend([ap.item()])
 
             if train_classifier and iteration % self.cls_freq == 0:
-                loss = criterion(pred, target.float())
-                loss.backward()
+                classifier.train()
 
-                optimizer_classifier.step()
+                data = th.cat([data_cheater, data_normal])
+
+                dataset = TensorDataset(data, target.float())
+                dataloader = DataLoader(
+                    dataset, batch_size=self.cls_batch_size, shuffle=True
+                )
+
+                num_data = data.shape[0]
+                losses_cls = []
+                for _ in range(self.cls_epoch):
+                    loss_cls = 0
+                    for _, batch in enumerate(dataloader):
+                        batch_x, batch_y = batch
+
+                        optimizer_classifier.zero_grad()
+                        batch_pred = classifier(batch_x)
+                        loss = criterion(batch_pred, batch_y)
+                        loss.backward()
+                        optimizer_classifier.step()
+                        loss_cls += loss.item() * batch_x.shape[0]
+                    losses_cls.append(loss_cls / num_data)
+
+                loss_mean = statistics.fmean(losses_cls)
 
                 # Logging loss
-                self.ep_cls_buffer.extend([loss.item()])
+                self.ep_cls_buffer.extend([loss_mean])
 
         callback.on_training_end()
 

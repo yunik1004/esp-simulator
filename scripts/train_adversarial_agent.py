@@ -19,7 +19,10 @@ from torch import nn
 from torch.optim import Adam
 
 from esp_simulator.models.item_farm import ItemFarmAntiCheater
-from esp_simulator.policies import construct_ItemFarmPolicy, construct_MixedItemFarmPolicy
+from esp_simulator.policies import (
+    construct_ItemFarmPolicy,
+    construct_MixedItemFarmPolicy,
+)
 
 from utils.agents import add_argument_train_agent
 from utils.algorithms import add_argument_algorithm
@@ -98,6 +101,8 @@ def main(args: argparse.Namespace) -> None:
         adversary=True,
         adv_coef=args.adv_coef,
         cls_freq=args.cls_freq,
+        cls_epoch=args.cls_epoch,
+        cls_batch_size=args.cls_batch_size,
     )
     if args.checkpoint != "":
         model.set_parameters(args.checkpoint)
@@ -197,6 +202,12 @@ def get_args() -> argparse.Namespace:
         "--cls_freq", type=int, default=1, help="classifier update frequency"
     )
     parser.add_argument(
+        "--cls_epoch", type=int, default=1, help="classifier update epoch"
+    )
+    parser.add_argument(
+        "--cls_batch_size", type=int, default=8, help="classifier update batch size"
+    )
+    parser.add_argument(
         "--checkpoint", type=str, default="", help="checkpoint of the model"
     )
     parser.add_argument(
@@ -226,7 +237,7 @@ def get_args() -> argparse.Namespace:
         "--method",
         type=str,
         default="reward_shaping",
-        choices=["reward_shaping", "policy_gradient"],
+        choices=["reward_shaping"],
         help="adversarial training method",
     )
     return parser.parse_args()
