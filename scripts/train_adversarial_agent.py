@@ -196,7 +196,7 @@ def get_args() -> argparse.Namespace:
         help="the number of timesteps in adversarial training mode",
     )
     parser.add_argument(
-        "--adv_coef", type=float, default=0.1, help="adversarial training coefficient"
+        "--adv_coef", type=float, default=1.0, help="adversarial training coefficient"
     )
     parser.add_argument(
         "--cls_freq", type=int, default=1, help="classifier update frequency"
