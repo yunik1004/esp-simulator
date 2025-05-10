@@ -627,6 +627,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         cls_freq: int = 1,
         cls_epoch: int = 1,
         cls_batch_size: int = 8,
+        cls_contam_ratio: float = 0.0,
         *args,
         **kwargs,
     ):
@@ -635,6 +636,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         self.cls_freq = cls_freq
         self.cls_epoch = cls_epoch
         self.cls_batch_size = cls_batch_size
+        self.cls_contam_ratio = cls_contam_ratio
         self.ep_adv_buffer = None
         self.ep_cls_buffer = None
         self.ep_auroc_buffer = None
@@ -1270,6 +1272,27 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
 
                 data = th.cat([data_cheater, data_normal])
 
+                # Contamination: Rearrange target
+                cheater_indices = (target == 1).nonzero(as_tuple=True)[0]
+                normal_indices = (target == 0).nonzero(as_tuple=True)[0]
+
+                num_cheaters = len(cheater_indices)
+                num_normals = len(normal_indices)
+
+                num_flips_cheater = int(num_cheaters * self.cls_contam_ratio)
+                num_flips_normal = int(num_normals * self.cls_contam_ratio)
+
+                flip_cheater_indices = cheater_indices[
+                    th.randperm(num_cheaters)[:num_flips_cheater]
+                ]
+                flip_normal_indices = normal_indices[
+                    th.randperm(num_normals)[:num_flips_normal]
+                ]
+
+                target[flip_cheater_indices] = 0
+                target[flip_normal_indices] = 1
+
+                # Create dataset & dataloader
                 dataset = TensorDataset(data, target.float())
                 dataloader = DataLoader(
                     dataset, batch_size=self.cls_batch_size, shuffle=True

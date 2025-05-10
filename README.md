@@ -90,5 +90,6 @@ python scripts/train_adversarial_agent.py --mixed \
         --features_dim 64 \
         --checkpoint_classifier CHECKPOINT_DETECTOR_PATH \
         --adv_coef 1.0 \
+        --cls_contam_ratio 0.0 \
         --train_classifier
 ```

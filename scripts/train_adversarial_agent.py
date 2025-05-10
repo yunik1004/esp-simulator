@@ -103,6 +103,7 @@ def main(args: argparse.Namespace) -> None:
         cls_freq=args.cls_freq,
         cls_epoch=args.cls_epoch,
         cls_batch_size=args.cls_batch_size,
+        cls_contam_ratio=args.cls_contam_ratio,
     )
     if args.checkpoint != "":
         model.set_parameters(args.checkpoint)
@@ -206,6 +207,12 @@ def get_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--cls_batch_size", type=int, default=8, help="classifier update batch size"
+    )
+    parser.add_argument(
+        "--cls_contam_ratio",
+        type=float,
+        default=0.0,
+        help="classifier contamination ratio",
     )
     parser.add_argument(
         "--checkpoint", type=str, default="", help="checkpoint of the model"
