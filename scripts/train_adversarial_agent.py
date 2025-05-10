@@ -209,12 +209,6 @@ def get_args() -> argparse.Namespace:
         "--cls_batch_size", type=int, default=8, help="classifier update batch size"
     )
     parser.add_argument(
-        "--cls_contam_ratio",
-        type=float,
-        default=0.0,
-        help="classifier contamination ratio",
-    )
-    parser.add_argument(
         "--checkpoint", type=str, default="", help="checkpoint of the model"
     )
     parser.add_argument(

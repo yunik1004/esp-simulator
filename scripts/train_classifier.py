@@ -75,10 +75,14 @@ class TrainerDataModule(L.LightningDataModule):
 
     def prepare_data(self):
         self.train_dataset = ItemFarmClassificationDataset(
-            self.hparams.dataset_normal_train, self.hparams.dataset_esp_train
+            self.hparams.dataset_normal_train,
+            self.hparams.dataset_esp_train,
+            self.hparams.cls_contam_ratio,
         )
         self.val_dataset = ItemFarmClassificationDataset(
-            self.hparams.dataset_normal_val, self.hparams.dataset_esp_val
+            self.hparams.dataset_normal_val,
+            self.hparams.dataset_esp_val,
+            self.hparams.cls_contam_ratio,
         )
 
     def train_dataloader(self):

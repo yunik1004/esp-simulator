@@ -43,12 +43,12 @@ python scripts/construct_mixed_agent.py \
 
 ```bash
 ## Train
-python scripts/gendata_classifier.py [--cheater | --mixed] \
+python scripts/gendata_classifier.py --cheater \
         --checkpoint CHECKPOINT_PATH \
         --seed_envs 0-9999 \
         --output_path ./output/train_data.npy
 ## Val
-python scripts/gendata_classifier.py [--cheater | --mixed] \
+python scripts/gendata_classifier.py --cheater \
         --checkpoint CHECKPOINT_PATH \
         --seed_envs 10000-11999 \
         --output_path ./output/val_data.npy
