@@ -12,6 +12,8 @@ uv pip install .
 ### Train agents
 
 ```bash
+# Use `--cheater` to train pure cheater
+# Use `--mixed` to train (mixed) cheater
 python scripts/train_agent.py [--cheater] --seed 0
 ```
 
@@ -43,12 +45,12 @@ python scripts/construct_mixed_agent.py \
 
 ```bash
 ## Train
-python scripts/gendata_classifier.py --cheater \
+python scripts/gendata_classifier.py [--cheater] \
         --checkpoint CHECKPOINT_PATH \
         --seed_envs 0-9999 \
         --output_path ./output/train_data.npy
 ## Val
-python scripts/gendata_classifier.py --cheater \
+python scripts/gendata_classifier.py [--cheater] \
         --checkpoint CHECKPOINT_PATH \
         --seed_envs 10000-11999 \
         --output_path ./output/val_data.npy
