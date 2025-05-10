@@ -12,14 +12,14 @@ uv pip install .
 ### Train agents
 
 ```bash
-# Use `--cheater` to train pure cheater
-# Use `--mixed` to train (mixed) cheater
+# Specify `--cheater` to use pure cheater
 python scripts/train_agent.py [--cheater] --seed 0
 ```
 
 ### Test agents
 
 ```bash
+# Specify `--mixed` to use (mixed) cheater
 python scripts/test_agent.py [--cheater | --mixed] --checkpoint CHECKPOINT_PATH
 ```
 
