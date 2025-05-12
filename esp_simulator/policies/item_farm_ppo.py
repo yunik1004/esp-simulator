@@ -1,6 +1,7 @@
 from collections import deque
 from collections.abc import Generator
 from functools import partial
+import hashlib
 import statistics
 from typing import Any, List, Optional, Union
 import warnings
@@ -628,6 +629,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         cls_epoch: int = 1,
         cls_batch_size: int = 8,
         cls_contam_ratio: float = 0.0,
+        machine_epsilon: float = 1e-5,
         *args,
         **kwargs,
     ):
@@ -637,6 +639,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         self.cls_epoch = cls_epoch
         self.cls_batch_size = cls_batch_size
         self.cls_contam_ratio = cls_contam_ratio
+        self.machine_epsilon = machine_epsilon
         self.ep_adv_buffer = None
         self.ep_cls_buffer = None
         self.ep_auroc_buffer = None
@@ -1273,24 +1276,15 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
                 data = th.cat([data_cheater, data_normal])
 
                 # Contamination: Rearrange target
-                cheater_indices = (target == 1).nonzero(as_tuple=True)[0]
-                normal_indices = (target == 0).nonzero(as_tuple=True)[0]
+                if self.cls_contam_ratio > self.machine_epsilon:
+                    threshold = int(self.cls_contam_ratio * (2**64))
 
-                num_cheaters = len(cheater_indices)
-                num_normals = len(normal_indices)
-
-                num_flips_cheater = int(num_cheaters * self.cls_contam_ratio)
-                num_flips_normal = int(num_normals * self.cls_contam_ratio)
-
-                flip_cheater_indices = cheater_indices[
-                    th.randperm(num_cheaters)[:num_flips_cheater]
-                ]
-                flip_normal_indices = normal_indices[
-                    th.randperm(num_normals)[:num_flips_normal]
-                ]
-
-                target[flip_cheater_indices] = 0
-                target[flip_normal_indices] = 1
+                    for ddx in range(data.shape[0]):
+                        data_hash = hashlib.sha256(
+                            data[ddx].detach().cpu().contiguous().numpy().tobytes()
+                        ).hexdigest()
+                        if int(data_hash[:16], 16) < threshold:
+                            target[ddx] = 1 - target[ddx]
 
                 # Create dataset & dataloader
                 dataset = TensorDataset(data, target.float())
