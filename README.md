@@ -66,7 +66,6 @@ python scripts/gendata_classifier.py [--cheater | --mixed] \
 ```bash
 python scripts/train_classifier.py \
         --features_dim 64 \
-        --cls_contam_ratio 0.0 \
         --dataset_normal_train ./output/train_noncheater.npy \
         --dataset_normal_val ./output/val_noncheater.npy \
         --dataset_esp_train ./output/train_cheater.npy \
@@ -93,6 +92,5 @@ python scripts/train_adversarial_agent.py --mixed \
         --features_dim 64 \
         --checkpoint_classifier CHECKPOINT_DETECTOR_PATH \
         --adv_coef 1.0 \
-        --cls_contam_ratio 0.0 \
         --train_classifier
 ```
