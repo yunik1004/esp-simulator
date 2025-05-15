@@ -116,11 +116,11 @@ def main(args: argparse.Namespace) -> None:
     # Save path as image
     if args.output_path_image != "":
         maps = vec_env.envs[0].unwrapped.visualize_status()
-        map_total = maps["total"]
-        _, w, h = map_total.shape
-        map_total_vis = np.concatenate((map_total, np.zeros((1, w, h))))
+        map_traj = maps["total"][0].transpose()
+        img = Image.fromarray(np.uint8(map_traj * 255), "L").resize(
+            (352, 352), Image.Resampling.NEAREST
+        )
 
-        img = Image.fromarray(np.uint8(map_total_vis * 255).transpose(2, 1, 0))
         img.save(args.output_path_image)
 
     vec_env.close()
