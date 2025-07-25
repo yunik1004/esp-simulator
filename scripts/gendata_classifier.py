@@ -40,6 +40,8 @@ def main(args: argparse.Namespace) -> None:
         )
 
     maps = []
+    traj_lengths = []
+    total_rewards = []
     for seed_env in tqdm(args.seed_envs):
         if not args.optimal:
             model.set_random_seed(args.seed_policy)
@@ -47,6 +49,7 @@ def main(args: argparse.Namespace) -> None:
 
         states = None
         dones = np.zeros(args.num_repeats, dtype=bool)
+        trewards = np.zeros(args.num_repeats)
         obss = vec_env.reset()
 
         optimal_steps = vec_env.env_method("get_wrapper_attr", "optimal_steps")
@@ -69,6 +72,7 @@ def main(args: argparse.Namespace) -> None:
                 )
 
             obss, rewards, dones_tmp, infos = vec_env.step(actions)
+            trewards += rewards
 
             for rdx in range(args.num_repeats):
                 if dones[rdx]:
@@ -77,15 +81,23 @@ def main(args: argparse.Namespace) -> None:
                     dones[rdx] = True
                     map_total = infos[rdx]["visual_status"]
                     maps.append(map_total)
+                    traj_lengths.append(step + 1)
+                    total_rewards.append(trewards[rdx])
 
             if all(dones):
                 break
 
     vec_env.close()
 
-    # Save maps in npy file format
+    # Save maps, traj lengths, total rewards in npy file format
     maps = np.stack(maps)
     np.save(args.output_path, maps)
+
+    traj_lengths = np.stack(traj_lengths)
+    np.save(args.output_path.replace(".npy", "_traj_len.npy"), traj_legnths)
+
+    total_rewards = np.stack(total_rewards)
+    np.save(args.output_path.replace(".npy", "_total_rew.npy"), total_rewards)
 
 
 def get_args() -> argparse.Namespace:

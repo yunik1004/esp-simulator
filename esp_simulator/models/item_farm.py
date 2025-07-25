@@ -143,3 +143,27 @@ class ItemFarmAntiCheater(nn.Module):
 
     def forward(self, map: torch.Tensor) -> torch.Tensor:
         return self.mlp(self.cnn(map)).squeeze(1)
+
+
+class ItemFarmTrajectoryLengthAntiCheater(nn.Module):
+    def __init__(self, grid_size: int) -> None:
+        super().__init__()
+
+        self.log_k = nn.Parameter(torch.tensor(0.0))  # sharpness
+        self.threshold = nn.Parameter(torch.tensor(50.0))  # decision boundary
+
+    def forward(self, length: torch.Tensor) -> torch.Tensor:
+        k = torch.exp(self.log_k)
+        return torch.sigmoid(k * (self.threshold - length))
+
+
+class ItemFarmRewardAntiCheater(nn.Module):
+    def __init__(self, grid_size: int) -> None:
+        super().__init__()
+
+        self.log_k = nn.Parameter(torch.tensor(0.0))  # sharpness
+        self.threshold = nn.Parameter(torch.tensor(4.7))  # decision boundary
+
+    def forward(self, reward: torch.Tensor) -> torch.Tensor:
+        k = torch.exp(self.log_k)
+        return torch.sigmoid(k * (reward - self.threshold))

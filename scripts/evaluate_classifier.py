@@ -12,7 +12,11 @@ from torchmetrics.classification import (
 )
 
 from esp_simulator.data.item_farm import ItemFarmClassificationDataset
-from esp_simulator.models.item_farm import ItemFarmAntiCheater
+from esp_simulator.models.item_farm import (
+    ItemFarmAntiCheater,
+    ItemFarmRewardAntiCheater,
+    ItemFarmTrajectoryLengthAntiCheater,
+)
 
 from utils.classifiers import add_argument_classifier
 from utils.environments import add_argument_environment
@@ -24,10 +28,16 @@ class TesterModel(L.LightningModule):
     def __init__(self, hparams: argparse.Namespace):
         super().__init__()
         self.save_hyperparameters(hparams)
-
-        self.model = ItemFarmAntiCheater(
-            grid_size=self.hparams.grid_size, features_dim=self.hparams.features_dim
-        )
+        if self.hparams.cls_type == "heatmap":
+            self.model = ItemFarmAntiCheater(
+                grid_size=self.hparams.grid_size, features_dim=self.hparams.features_dim
+            )
+        elif self.hparams.cls_type == "length":
+            self.model = ItemFarmTrajectoryLengthAntiCheater(
+                grid_size=self.hparams.grid_size
+            )
+        elif self.hparams.cls_type == "reward":
+            self.model = ItemFarmRewardAntiCheater(grid_size=self.hparams.grid_size)
         self.criterion = nn.BCEWithLogitsLoss()
 
     def load_checkpoint(self, checkpoint_path: str) -> None:
