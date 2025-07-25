@@ -94,7 +94,7 @@ def main(args: argparse.Namespace) -> None:
     np.save(args.output_path, maps)
 
     traj_lengths = np.stack(traj_lengths)
-    np.save(args.output_path.replace(".npy", "_traj_len.npy"), traj_legnths)
+    np.save(args.output_path.replace(".npy", "_traj_len.npy"), traj_lengths)
 
     total_rewards = np.stack(total_rewards)
     np.save(args.output_path.replace(".npy", "_total_rew.npy"), total_rewards)
