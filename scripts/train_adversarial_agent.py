@@ -104,6 +104,7 @@ def main(args: argparse.Namespace) -> None:
         device=fabric.device,
         adversary=True,
         adv_coef=args.adv_coef,
+        cls_type=args.cls_type,
         cls_freq=args.cls_freq,
         cls_epoch=args.cls_epoch,
         cls_batch_size=args.cls_batch_size,

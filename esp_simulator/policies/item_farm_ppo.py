@@ -513,6 +513,7 @@ class ItemFarmPPO(PPO):
         self,
         env: VecEnv,
         batch_size: int,
+        vis_type: str = "heatmap",
     ) -> List[th.Tensor]:
         """
         Collect visual status
@@ -578,7 +579,12 @@ class ItemFarmPPO(PPO):
             # see GitHub issue #633
             for idx, done in enumerate(dones):
                 if done:
-                    map = infos[idx]["visual_status"]
+                    if vis_type == "heatmap":
+                        map = infos[idx]["visual_status"]
+                    elif vis_type == "length":
+                        map = infos[idx]["total_step"]
+                    elif vis_type == "reward":
+                        map = infos[idx]["total_reward"]
                     map = th.tensor(map, device=self.device).float()
                     output_buffer.append(map)
 
@@ -625,6 +631,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
     def __init__(
         self,
         adv_coef: float = 0.0,
+        cls_type: str = "heatmap",
         cls_freq: int = 1,
         cls_epoch: int = 1,
         cls_batch_size: int = 8,
@@ -635,6 +642,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
     ):
         super().__init__(*args, **kwargs)
         self.adv_coef = adv_coef
+        self.cls_type = cls_type
         self.cls_freq = cls_freq
         self.cls_epoch = cls_epoch
         self.cls_batch_size = cls_batch_size
@@ -794,7 +802,12 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
 
                 if done:
                     # Adversarial reward
-                    map = infos[idx]["visual_status"]
+                    if self.cls_type == "heatmap":
+                        map = infos[idx]["visual_status"]
+                    elif self.cls_type == "length":
+                        map = infos[idx]["total_step"]
+                    elif self.cls_type == "reward":
+                        map = infos[idx]["total_reward"]
                     map = th.tensor(map, device=self.device).float().unsqueeze(0)
                     data_cheater.append(map)
                     with th.no_grad():
@@ -825,6 +838,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
         vis_normal = agent_normal.collect_visual_status(
             env=agent_normal.env,
             batch_size=batch_size,
+            vis_type=self.cls_type,
         )
         data_normal.append(vis_normal)
         pred_normal = classifier(vis_normal)

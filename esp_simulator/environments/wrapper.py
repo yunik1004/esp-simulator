@@ -45,8 +45,18 @@ class ImgScaleWrapper(ObservationWrapper):
 class VisualizeFinalStatusWrapper(Wrapper):
     """A wrapper to visualize the final status of the map"""
 
+    def reset(self, *, seed=None, options=None):
+        obs, info = self.env.reset(seed=seed, options=options)
+        self.total_reward = 0
+        self.total_step = 0
+        return obs, info
+
     def step(self, action):
         obs, reward, terminated, truncated, info = self.env.step(action)
+        self.total_reward += reward
+        self.total_step += 1
         if terminated or truncated:
             info["visual_status"] = self.env.unwrapped.visualize_status()["total"]
+            info["total_step"] = self.total_reward
+            info["total_reward"] = self.total_step
         return obs, reward, terminated, truncated, info
