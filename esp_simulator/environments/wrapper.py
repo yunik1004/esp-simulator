@@ -57,6 +57,6 @@ class VisualizeFinalStatusWrapper(Wrapper):
         self.total_step += 1
         if terminated or truncated:
             info["visual_status"] = self.env.unwrapped.visualize_status()["total"]
-            info["total_step"] = self.total_reward
-            info["total_reward"] = self.total_step
+            info["total_step"] = self.total_step
+            info["total_reward"] = self.total_reward
         return obs, reward, terminated, truncated, info
