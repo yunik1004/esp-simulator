@@ -6,7 +6,7 @@ def add_argument_train_agent(parser: argparse.ArgumentParser):
         "--log_dir", type=str, default="./output", help="tensorboard log dir"
     )
     parser.add_argument(
-        "--log_name", type=str, default="ESPSimul", help="tensorboard log name"
+        "--log_name", type=str, default="Blackjack", help="tensorboard log name"
     )
     parser.add_argument("--lr", type=float, default=3e-4, help="learning rate")
     parser.add_argument(

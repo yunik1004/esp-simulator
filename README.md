@@ -89,7 +89,6 @@ python scripts/evaluate_classifier.py \
 python scripts/train_adversarial_agent.py --mixed \
         --checkpoint CHECKPOINT_CHEATER_PATH \
         --checkpoint_normal CHECKPOINT_NORMAL_PATH \
-        --features_dim 64 \
         --checkpoint_classifier CHECKPOINT_DETECTOR_PATH \
         --adv_coef 1.0 \
         --train_classifier
