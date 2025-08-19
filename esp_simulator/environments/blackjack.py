@@ -136,7 +136,10 @@ class BlackjackEnv(gym.Env):
                 reward = -self.total_bet
         elif action == BlackjackActions.surrender:
             terminated = True
-            reward = -0.5 * self.total_bet
+            if self.step_count == 0:
+                reward = -0.5 * self.total_bet
+            else:
+                reward = -2 * self.total_bet
         else:
             terminated = True
             dealer_hand = self.selected_numbers[:2]
