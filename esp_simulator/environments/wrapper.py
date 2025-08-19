@@ -64,6 +64,12 @@ class VisualizeFinalStatusWrapper(Wrapper):
 
 class BlackjackObjScaleWrapper(ObservationWrapper):
     def observation(self, obs):
+        obs["image"] = self._scale_obs(obs["image"])
+        if "image_cheater" in obs:
+            obs["image_cheater"] = self._scale_obs(obs["image_cheater"])
+        return obs
+
+    def _scale_obs(self, obs):
         obs[0] = obs[0] / 10
         obs[2] = obs[2] / 10
         obs[3] = obs[3] / 4

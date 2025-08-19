@@ -1,4 +1,7 @@
+from typing import Dict
+
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
+from stable_baselines3.common.type_aliases import TensorDict
 import torch
 from torch import nn
 
@@ -16,7 +19,7 @@ class BlackjackFeaturesExtractor(BaseFeaturesExtractor):
         self.cnn = nn.Sequential(
             nn.Conv1d(n_input_channels, 3, 1),
             nn.ReLU(),
-            nn.Conv1d(3, 1, 1),
+            nn.Conv1d(3, 2, 1),
             nn.ReLU(),
             nn.Flatten(),
         )
@@ -36,3 +39,41 @@ class BlackjackFeaturesExtractor(BaseFeaturesExtractor):
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
         return self.mlp(self.cnn(observations))
+
+
+class BlackjackMultiFeaturesExtractor(BaseFeaturesExtractor):
+    """
+    Feature extractor for Blackjack environment, multiple-input case
+    Refer to: stable_baselines3.common.torch_layers.CombinedExtractor
+    """
+
+    def __init__(
+        self,
+        observation_space,
+        features_dim=8,
+        normalized_image=False,
+        image_features_extractor: BaseFeaturesExtractor = BlackjackFeaturesExtractor,
+    ):
+        super().__init__(observation_space, 1)
+
+        extractors: Dict[str, nn.Module] = {}
+
+        total_concat_size = 0
+        for key, subspace in observation_space.spaces.items():
+            extractors[key] = image_features_extractor(
+                subspace,
+                features_dim=features_dim,
+            )
+            total_concat_size += features_dim
+
+        self.extractors = nn.ModuleDict(extractors)
+
+        # Update the features dim manually
+        self._features_dim = total_concat_size
+
+    def forward(self, observations: TensorDict) -> torch.Tensor:
+        encoded_tensor_list = []
+
+        for key, extractor in self.extractors.items():
+            encoded_tensor_list.append(extractor(observations[key]))
+        return torch.cat(encoded_tensor_list, dim=1)

@@ -69,12 +69,24 @@ class BlackjackEnv(gym.Env):
 
         # channel: obs_partial, check_ace_partial, state, check_ace_state, action
         # obs/state: dealer_1, (dealer_2), player_1, player_2, ..., (inv_1), (inv_2), ...
-        self.observation_space = spaces.Box(
+        image_observation_space = spaces.Box(
             low=0,
             high=10,
             shape=(4, self.num_cards_required),
             dtype="uint8",
         )
+        self.observation_space = spaces.Dict(
+            {
+                "image": image_observation_space,
+            }
+        )
+        if self.is_mixed:
+            self.observation_space["image_cheater"] = spaces.Box(
+                low=0,
+                high=10,
+                shape=(4, self.num_cards_required),
+                dtype="uint8",
+            )
 
     def reset(
         self,
@@ -106,20 +118,29 @@ class BlackjackEnv(gym.Env):
         self.view_mask[2] = True
         self.view_mask[3] = True
 
+        self.prev_action = np.zeros((1, self.num_cards_required), dtype="uint8")
+        obs = self.get_obs()
+
+        return obs, {}
+
+    def get_obs(self):
         partial_obs = np.where(self.view_mask, self.state, 0)
 
-        self.prev_action = np.zeros((1, self.num_cards_required), dtype="uint8")
-
+        obs = {}
         if self.is_cheater:
-            obs = np.concatenate(
+            obs["image"] = np.concatenate(
                 [partial_obs[:1], self.state, self.prev_action], axis=0
             )
         else:
-            obs = np.concatenate(
+            obs["image"] = np.concatenate(
                 [partial_obs[:1], partial_obs, self.prev_action], axis=0
             )
 
-        return obs, {}
+        if self.is_mixed:
+            obs["image_cheater"] = np.concatenate(
+                [partial_obs[:1], partial_obs, self.prev_action], axis=0
+            )
+        return obs
 
     def step(self, action):
         reward = 0
@@ -195,17 +216,9 @@ class BlackjackEnv(gym.Env):
                 else:
                     reward -= self.total_bet
 
-        partial_obs = np.where(self.view_mask, self.state, 0)
-
         self.prev_action[0, self.step_base + self.step_count - 1] = action + 1
-        if self.is_cheater:
-            obs = np.concatenate(
-                [partial_obs[:1], self.state, self.prev_action], axis=0
-            )
-        else:
-            obs = np.concatenate(
-                [partial_obs[:1], partial_obs, self.prev_action], axis=0
-            )
+
+        obs = self.get_obs()
 
         self.step_count += 1
 

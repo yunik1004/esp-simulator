@@ -1,6 +1,6 @@
 from stable_baselines3 import PPO
 
-from ..models.blackjack import BlackjackFeaturesExtractor
+from ..models.blackjack import BlackjackMultiFeaturesExtractor
 
 
 class BlackjackAdversarialPPO(PPO):
@@ -8,14 +8,14 @@ class BlackjackAdversarialPPO(PPO):
 
 
 def construct_BlackjackPPO(
-    features_dim: int = 64, adversary: bool = False, *args, **kwargs
+    features_dim: int = 8, adversary: bool = False, *args, **kwargs
 ) -> PPO:
     """Construct BlackjackPPO policy with multiple-input feature extractor
 
     Parameters
     ----------
     features_dim : int, optional
-        Feature dimension, by default 64
+        Feature dimension, by default 8
 
     Returns
     -------
@@ -23,7 +23,7 @@ def construct_BlackjackPPO(
         ItemFarmPPO object
     """
     policy_kwargs = dict(
-        features_extractor_class=BlackjackFeaturesExtractor,
+        features_extractor_class=BlackjackMultiFeaturesExtractor,
         features_extractor_kwargs=dict(
             features_dim=features_dim,
         ),
