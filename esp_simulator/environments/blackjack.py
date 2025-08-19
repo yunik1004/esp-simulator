@@ -1,4 +1,5 @@
 from itertools import product
+from typing import Any
 
 import gymnasium as gym
 from gymnasium import spaces
@@ -79,6 +80,7 @@ class BlackjackEnv(gym.Env):
         self,
         *,
         seed: int | None = None,
+        options: dict[str, Any] | None = None,
     ):
         super().reset(seed=seed)
 
@@ -182,7 +184,7 @@ class BlackjackEnv(gym.Env):
 
                 if dealer_max_score > 21 or player_max_score > dealer_max_score:
                     if is_blackjack:
-                        reward = self.total_bet * 1.5
+                        reward = self.total_bet * self.blackjack_ratio
                     else:
                         reward = self.total_bet
                 elif player_max_score == dealer_max_score:

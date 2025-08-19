@@ -4,6 +4,7 @@ from typing import Callable, Sequence
 import gymnasium as gym
 
 from esp_simulator.environments.blackjack import BlackjackEnv
+from esp_simulator.environments.wrapper import BlackjackObjScaleWrapper
 
 
 def make_env(
@@ -28,6 +29,7 @@ def make_env(
         is_mixed=args.mixed,
         **kwags,
     )
+    env = BlackjackObjScaleWrapper(env)
 
     if post_wrappers:
         for wrapper in post_wrappers:

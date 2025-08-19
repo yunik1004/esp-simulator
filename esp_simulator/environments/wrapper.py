@@ -60,3 +60,11 @@ class VisualizeFinalStatusWrapper(Wrapper):
             info["total_step"] = self.total_step
             info["total_reward"] = self.total_reward
         return obs, reward, terminated, truncated, info
+
+
+class BlackjackObjScaleWrapper(ObservationWrapper):
+    def observation(self, obs):
+        obs[0] = obs[0] / 10
+        obs[2] = obs[2] / 10
+        obs[3] = obs[3] / 4
+        return obs
