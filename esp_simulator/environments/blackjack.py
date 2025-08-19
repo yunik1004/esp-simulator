@@ -18,6 +18,7 @@ class BlackjackEnv(gym.Env):
         init_bet: float = 1.0,
         blackjack_ratio: float = 1.5,
         num_decks: int = 1,
+        render_mode: str | None = None,
         is_cheater: bool = False,
         is_mixed: bool = False,
     ) -> None:
@@ -25,6 +26,8 @@ class BlackjackEnv(gym.Env):
         self.blackjack_ratio = blackjack_ratio
         self.num_decks = num_decks
         assert self.num_decks == 1
+
+        self.render_mode = render_mode
 
         self.is_cheater = is_cheater
         self.is_mixed = is_mixed
@@ -227,11 +230,19 @@ class BlackjackEnv(gym.Env):
     def render(self) -> str:
         po_decks = [
             f"({card})" if not mask else card
-            for card, mask in zip(self.full_decks, self.view_mask)
+            for card, mask in zip(self.selected_cards, self.view_mask)
         ]
         dealer_init_hand = po_decks[:2]
         player_init_hand = po_decks[2 : self.step_base]
-        deck = po_decks[self.step_base : self.step_base + self.step_count]
+        deck = po_decks[self.step_base :]
+        actions = self.prev_action[0, self.step_base - 1 :]
 
-        output = f"Dealer: {dealer_init_hand}\nPlayer: {player_init_hand}\nDeck: {deck}"
+        action_names = []
+        for ac in actions:
+            if ac == 0:
+                continue
+            action_names.append(BlackjackActions(ac - 1).name)
+
+        output = f"Dealer: {dealer_init_hand}\nPlayer: {player_init_hand}\nDeck: {deck}\nActions: {action_names}"
+        print(output)
         return output

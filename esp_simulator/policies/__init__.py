@@ -1,6 +1,7 @@
 import io
 import pathlib
 
+from stable_baselines3 import PPO
 from stable_baselines3.common.base_class import BaseAlgorithm
 import torch
 
@@ -55,3 +56,13 @@ def construct_BlackjackPolicy(
         return construct_BlackjackPPO(
             batch_size=batch_size, n_epochs=n_epochs, *args, **kwargs
         )
+
+
+def load_BlackjackPolicy(
+    algorithm: str = "ppo",
+    path: str | pathlib.Path | io.BufferedIOBase = "",
+    device: torch.device | str = "auto",
+):
+    assert algorithm in ["ppo"]
+    if algorithm == "ppo":
+        return PPO.load(path, device=device)

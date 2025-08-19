@@ -27,6 +27,7 @@ def make_env(
     env = BlackjackEnv(
         is_cheater=args.cheater,
         is_mixed=args.mixed,
+        render_mode="ansi",
         **kwags,
     )
     env = BlackjackObjScaleWrapper(env)
