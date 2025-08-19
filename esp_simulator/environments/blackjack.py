@@ -210,3 +210,15 @@ class BlackjackEnv(gym.Env):
         self.step_count += 1
 
         return obs, reward, terminated, truncated, info
+
+    def render(self) -> str:
+        po_decks = [
+            f"({card})" if not mask else card
+            for card, mask in zip(self.full_decks, self.view_mask)
+        ]
+        dealer_init_hand = po_decks[:2]
+        player_init_hand = po_decks[2 : self.step_base]
+        deck = po_decks[self.step_base : self.step_base + self.step_count]
+
+        output = f"Dealer: {dealer_init_hand}\nPlayer: {player_init_hand}\nDeck: {deck}"
+        return output
