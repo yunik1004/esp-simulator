@@ -180,7 +180,7 @@ class BlackjackEnv(gym.Env):
                     if dealer_min_score <= 11 and 1 in dealer_hand:
                         dealer_max_score = dealer_min_score + 10
 
-                if player_max_score > dealer_max_score:
+                if dealer_max_score > 21 or player_max_score > dealer_max_score:
                     if is_blackjack:
                         reward = self.total_bet * 1.5
                     else:
