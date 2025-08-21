@@ -13,20 +13,20 @@ uv pip install .
 
 ```bash
 # Specify `--cheater` to use pure cheater
-python scripts/train_agent.py [--cheater] --seed 0
+python scripts/grid_world/train_agent.py [--cheater] --seed 0
 ```
 
 ### Test agents
 
 ```bash
 # Specify `--mixed` to use (mixed) cheater
-python scripts/test_agent.py [--cheater | --mixed] --checkpoint CHECKPOINT_PATH
+python scripts/grid_world/test_agent.py [--cheater | --mixed] --checkpoint CHECKPOINT_PATH
 ```
 
 ### Evaluate agents
 
 ```bash
-python scripts/evaluate_agent.py [--cheater | --mixed] \
+python scripts/grid_world/evaluate_agent.py [--cheater | --mixed] \
         --checkpoint CHECKPOINT_PATH \
         --seed_envs 12000-13999
 ```
@@ -34,7 +34,7 @@ python scripts/evaluate_agent.py [--cheater | --mixed] \
 ## 3. Prepare mixed agents
 
 ```bash
-python scripts/construct_mixed_agent.py \
+python scripts/grid_world/construct_mixed_agent.py \
         --checkpoint CHECKPOINT_CHEATER_PATH \
         --checkpoint_normal CHECKPOINT_NORMAL_PATH
 ```
@@ -45,17 +45,17 @@ python scripts/construct_mixed_agent.py \
 
 ```bash
 ## Train
-python scripts/gendata_classifier.py [--cheater] \
+python scripts/grid_world/gendata_classifier.py [--cheater] \
         --checkpoint CHECKPOINT_PATH \
         --seed_envs 0-9999 \
         --output_path ./output/train_data.npy
 ## Val
-python scripts/gendata_classifier.py [--cheater] \
+python scripts/grid_world/gendata_classifier.py [--cheater] \
         --checkpoint CHECKPOINT_PATH \
         --seed_envs 10000-11999 \
         --output_path ./output/val_data.npy
 ## Test
-python scripts/gendata_classifier.py [--cheater | --mixed] \
+python scripts/grid_world/gendata_classifier.py [--cheater | --mixed] \
         --checkpoint CHECKPOINT_PATH \
         --seed_envs 12000-13999 \
         --output_path ./output/test_data.npy
@@ -64,7 +64,7 @@ python scripts/gendata_classifier.py [--cheater | --mixed] \
 ### Train classifier
 
 ```bash
-python scripts/train_classifier.py \
+python scripts/grid_world/train_classifier.py \
         --features_dim 64 \
         --dataset_normal_train ./output/train_noncheater.npy \
         --dataset_normal_val ./output/val_noncheater.npy \
@@ -75,7 +75,7 @@ python scripts/train_classifier.py \
 ### Evaluate classifier
 
 ```bash
-python scripts/evaluate_classifier.py \
+python scripts/grid_world/evaluate_classifier.py \
         --features_dim 64 \
         --checkpoint CHECKPOINT_PATH \
         --dataset_normal ./output/test_noncheater.npy \
@@ -86,7 +86,7 @@ python scripts/evaluate_classifier.py \
 
 ```bash
 # Remove `--train_classifier` if you don't want to train the detector.
-python scripts/train_adversarial_agent.py --mixed \
+python scripts/grid_world/train_adversarial_agent.py --mixed \
         --checkpoint CHECKPOINT_CHEATER_PATH \
         --checkpoint_normal CHECKPOINT_NORMAL_PATH \
         --checkpoint_classifier CHECKPOINT_DETECTOR_PATH \
