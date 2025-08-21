@@ -78,9 +78,13 @@ class BlackjackEnv(gym.Env):
             shape=(4, self.num_cards_required),
             dtype="uint8",
         )
+        count_player_observation_space = spaces.Box(
+            low=0, high=1, shape=(1,), dtype=float
+        )
         self.observation_space = spaces.Dict(
             {
                 "image": image_observation_space,
+                "count": count_player_observation_space,
             }
         )
         if self.is_mixed:
@@ -129,20 +133,38 @@ class BlackjackEnv(gym.Env):
     def get_obs(self):
         partial_obs = np.where(self.view_mask, self.state, 0)
 
+        image_noncheater = np.concatenate(
+            [partial_obs[:1], partial_obs, self.prev_action], axis=0
+        )
+        image_cheater = np.concatenate(
+            [partial_obs[:1], self.state, self.prev_action], axis=0
+        )
+
+        # dealer_hand = self.selected_numbers[:2]
+        player_hand = self.selected_numbers[2 : self.step_base + self.step_count]
+
+        """
+        dealer_count_noncheater = dealer_hand[0]
+        if dealer_count_noncheater == 1:
+            dealer_count_noncheater += 10
+        dealer_count_cheater = sum(dealer_hand)
+        if 1 in dealer_hand and dealer_count_cheater <= 11:
+            dealer_count_cheater += 10
+        """
+
+        player_count = sum(player_hand)
+        if 1 in player_hand and player_count <= 11:
+            player_count += 10
+
         obs = {}
         if self.is_cheater:
-            obs["image"] = np.concatenate(
-                [partial_obs[:1], self.state, self.prev_action], axis=0
-            )
+            obs["image"] = image_cheater.copy()
         else:
-            obs["image"] = np.concatenate(
-                [partial_obs[:1], partial_obs, self.prev_action], axis=0
-            )
+            obs["image"] = image_noncheater.copy()
+        obs["count"] = np.array([player_count / 21])
 
         if self.is_mixed:
-            obs["image_cheater"] = np.concatenate(
-                [partial_obs[:1], partial_obs, self.prev_action], axis=0
-            )
+            obs["image_cheater"] = image_cheater.copy()
         return obs
 
     def step(self, action):
@@ -221,9 +243,9 @@ class BlackjackEnv(gym.Env):
 
         self.prev_action[0, self.step_base + self.step_count - 1] = action + 1
 
-        obs = self.get_obs()
-
         self.step_count += 1
+
+        obs = self.get_obs()
 
         return obs, reward, terminated, truncated, info
 

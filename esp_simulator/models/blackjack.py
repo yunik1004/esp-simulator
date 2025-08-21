@@ -1,5 +1,6 @@
 from typing import Dict
 
+from stable_baselines3.common.preprocessing import get_flattened_obs_dim
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.type_aliases import TensorDict
 import torch
@@ -60,11 +61,19 @@ class BlackjackMultiFeaturesExtractor(BaseFeaturesExtractor):
 
         total_concat_size = 0
         for key, subspace in observation_space.spaces.items():
-            extractors[key] = image_features_extractor(
-                subspace,
-                features_dim=features_dim,
-            )
-            total_concat_size += features_dim
+            if "image" in key:
+                extractors[key] = image_features_extractor(
+                    subspace,
+                    features_dim=features_dim,
+                )
+                total_concat_size += features_dim
+            else:
+                # The observation key is a vector, flatten it if needed
+                obs_dim = get_flattened_obs_dim(subspace)
+                extractors[key] = nn.Sequential(
+                    nn.Flatten(), nn.Linear(obs_dim, obs_dim)
+                )
+                total_concat_size += obs_dim
 
         self.extractors = nn.ModuleDict(extractors)
 
