@@ -40,7 +40,7 @@ class TesterModel(L.LightningModule):
             self.model = ItemFarmRewardAntiCheater(grid_size=self.hparams.grid_size)
         self.criterion = nn.BCEWithLogitsLoss()
 
-    def load_checkpoint(self, checkpoint_path: str) -> None:
+    def load_checkpoint(self, checkpoint_path: str, device: torch.device | str = "auto") -> None:
         """Load model weight from the checkpoint
 
         Parameters
@@ -48,7 +48,7 @@ class TesterModel(L.LightningModule):
         checkpoint_path : str
             Path to checkpoint
         """
-        checkpoint = torch.load(checkpoint_path)
+        checkpoint = torch.load(checkpoint_path, map_location=device)
         if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
             checkpoint = checkpoint["state_dict"]
         self.model.load_state_dict(checkpoint, strict=False)
@@ -198,7 +198,7 @@ def main(args: argparse.Namespace) -> None:
     dm = TesterDataModule(args)
     model = TesterModel(args)
     if args.checkpoint:
-        model.load_checkpoint(args.checkpoint)
+        model.load_checkpoint(args.checkpoint, device="auto")
 
     # Trainer
     trainer = L.Trainer(
