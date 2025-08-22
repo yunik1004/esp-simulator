@@ -268,3 +268,17 @@ class BlackjackEnv(gym.Env):
         output = f"Dealer: {dealer_init_hand}\nPlayer: {player_init_hand}\nDeck: {deck}\nActions: {action_names}"
         print(output)
         return output
+
+    def visualize_status(self) -> dict[str, np.ndarray]:
+        """Visualize the status
+
+        Returns
+        -------
+        dict[str, np.ndarray]
+            total
+        """
+        status = np.concatenate([self.state, self.prev_action], axis=0)
+        output = {
+            "total": status,
+        }
+        return output
