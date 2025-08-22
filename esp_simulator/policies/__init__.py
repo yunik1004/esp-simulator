@@ -5,7 +5,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.base_class import BaseAlgorithm
 import torch
 
-from .blackjack_ppo import construct_BlackjackPPO
+from .blackjack_ppo import construct_BlackjackPPO, construct_MixedBlackjackPPO
 from .item_farm_a2c import construct_ItemFarmA2C, ItemFarmA2C
 from .item_farm_ppo import (
     construct_ItemFarmPPO,
@@ -66,3 +66,13 @@ def load_BlackjackPolicy(
     assert algorithm in ["ppo"]
     if algorithm == "ppo":
         return PPO.load(path, device=device)
+
+
+def construct_MixedBlackjackPolicy(
+    algorithm: str = "ppo", batch_size: int = 64, n_epochs: int = 10, *args, **kwargs
+) -> BaseAlgorithm:
+    assert algorithm in ["ppo"]
+    if algorithm == "ppo":
+        return construct_MixedBlackjackPPO(
+            batch_size=batch_size, n_epochs=n_epochs, *args, **kwargs
+        )
