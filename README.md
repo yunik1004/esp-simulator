@@ -65,7 +65,6 @@ python scripts/grid_world/gendata_classifier.py [--cheater | --mixed] \
 
 ```bash
 python scripts/grid_world/train_classifier.py \
-        --features_dim 64 \
         --dataset_normal_train ./output/train_noncheater.npy \
         --dataset_normal_val ./output/val_noncheater.npy \
         --dataset_esp_train ./output/train_cheater.npy \
@@ -76,7 +75,6 @@ python scripts/grid_world/train_classifier.py \
 
 ```bash
 python scripts/grid_world/evaluate_classifier.py \
-        --features_dim 64 \
         --checkpoint CHECKPOINT_PATH \
         --dataset_normal ./output/test_noncheater.npy \
         --dataset_esp ./output/test_cheater.npy
