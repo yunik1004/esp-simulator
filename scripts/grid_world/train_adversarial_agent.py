@@ -130,7 +130,7 @@ def main(args: argparse.Namespace) -> None:
     if args.checkpoint_normal != "":
         model_normal.set_parameters(args_normal.checkpoint_normal)
 
-    if args.cls_type == "heatmap":
+    if args.cls_type == "trajectory":
         classifier = ItemFarmAntiCheater(
             grid_size=args.grid_size, features_dim=args.features_dim
         )
