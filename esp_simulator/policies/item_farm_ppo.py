@@ -513,7 +513,7 @@ class ItemFarmPPO(PPO):
         self,
         env: VecEnv,
         batch_size: int,
-        vis_type: str = "heatmap",
+        vis_type: str = "trajectory",
     ) -> List[th.Tensor]:
         """
         Collect visual status
@@ -579,7 +579,7 @@ class ItemFarmPPO(PPO):
             # see GitHub issue #633
             for idx, done in enumerate(dones):
                 if done:
-                    if vis_type == "heatmap":
+                    if vis_type == "trajectory":
                         map = infos[idx]["visual_status"]
                     elif vis_type == "length":
                         map = infos[idx]["total_step"]
@@ -631,7 +631,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
     def __init__(
         self,
         adv_coef: float = 0.0,
-        cls_type: str = "heatmap",
+        cls_type: str = "trajectory",
         cls_freq: int = 1,
         cls_epoch: int = 1,
         cls_batch_size: int = 8,
@@ -802,7 +802,7 @@ class ItemFarmAdversarialPPO(ItemFarmPPO):
 
                 if done:
                     # Adversarial reward
-                    if self.cls_type == "heatmap":
+                    if self.cls_type == "trajectory":
                         map = infos[idx]["visual_status"]
                     elif self.cls_type == "length":
                         map = infos[idx]["total_step"]

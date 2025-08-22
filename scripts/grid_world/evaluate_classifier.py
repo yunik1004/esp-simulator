@@ -28,7 +28,7 @@ class TesterModel(L.LightningModule):
     def __init__(self, hparams: argparse.Namespace):
         super().__init__()
         self.save_hyperparameters(hparams)
-        if self.hparams.cls_type == "heatmap":
+        if self.hparams.cls_type == "trajectory":
             self.model = ItemFarmAntiCheater(
                 grid_size=self.hparams.grid_size, features_dim=self.hparams.features_dim
             )
