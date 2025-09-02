@@ -18,14 +18,14 @@ import torch
 from torch import nn
 from torch.optim import Adam
 
-from esp_simulator.models.item_farm import (
-    ItemFarmAntiCheater,
-    ItemFarmRewardAntiCheater,
-    ItemFarmTrajectoryLengthAntiCheater,
+from esp_simulator.models.blackjack import (
+    BlackjackAntiCheater,
+    BlackjackRewardAntiCheater,
+    BlackjackTrajectoryLengthAntiCheater,
 )
 from esp_simulator.policies import (
-    construct_ItemFarmPolicy,
-    construct_MixedItemFarmPolicy,
+    construct_BlackjackPolicy,
+    construct_MixedBlackjackPolicy,
 )
 
 from utils.agents import add_argument_train_agent
@@ -86,9 +86,9 @@ def main(args: argparse.Namespace) -> None:
         vec_env_cls=SubprocVecEnv,
     )
 
-    constructor_fn = construct_ItemFarmPolicy
+    constructor_fn = construct_BlackjackPolicy
     if args.mixed:
-        constructor_fn = construct_MixedItemFarmPolicy
+        constructor_fn = construct_MixedBlackjackPolicy
 
     model = constructor_fn(
         algorithm=args.algo,
@@ -122,7 +122,7 @@ def main(args: argparse.Namespace) -> None:
         seed=args.seed,
         vec_env_cls=SubprocVecEnv,
     )
-    model_normal = construct_ItemFarmPolicy(
+    model_normal = construct_BlackjackPolicy(
         algorithm=args.algo,
         env=vec_env_normal,
         device=fabric.device,
@@ -130,14 +130,12 @@ def main(args: argparse.Namespace) -> None:
     if args.checkpoint_normal != "":
         model_normal.set_parameters(args_normal.checkpoint_normal)
 
-    if args.cls_type == "heatmap":
-        classifier = ItemFarmAntiCheater(
-            grid_size=args.grid_size, features_dim=args.features_dim
-        )
+    if args.cls_type == "trajectory":
+        classifier = BlackjackAntiCheater(features_dim=args.features_dim)
     elif args.cls_type == "length":
-        classifier = ItemFarmTrajectoryLengthAntiCheater(grid_size=args.grid_size)
+        classifier = BlackjackTrajectoryLengthAntiCheater()
     elif args.cls_type == "reward":
-        classifier = ItemFarmRewardAntiCheater(grid_size=args.grid_size)
+        classifier = BlackjackRewardAntiCheater()
     if args.checkpoint_classifier != "":
         checkpoint = torch.load(args.checkpoint_classifier)
         if isinstance(checkpoint, dict) and "state_dict" in checkpoint:

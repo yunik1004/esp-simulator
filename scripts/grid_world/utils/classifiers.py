@@ -5,15 +5,15 @@ def add_argument_classifier(parser: argparse.ArgumentParser):
     parser.add_argument(
         "--cls_type",
         type=str,
-        default="heatmap",
-        choices=["heatmap", "length", "reward"],
+        default="trajectory",
+        choices=["trajectory", "length", "reward"],
         help="type of the classifier",
     )
     parser.add_argument(
         "--features_dim",
         type=int,
         default=64,
-        help="feature dimension of the heatmap classifier",
+        help="feature dimension of the trajectory classifier",
     )
     parser.add_argument(
         "--cls_contam_ratio",

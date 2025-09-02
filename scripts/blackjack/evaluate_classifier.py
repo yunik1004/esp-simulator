@@ -12,10 +12,10 @@ from torchmetrics.classification import (
 )
 
 from esp_simulator.data.item_farm import ItemFarmClassificationDataset
-from esp_simulator.models.item_farm import (
-    ItemFarmAntiCheater,
-    ItemFarmRewardAntiCheater,
-    ItemFarmTrajectoryLengthAntiCheater,
+from esp_simulator.models.blackjack import (
+    BlackjackAntiCheater,
+    BlackjackRewardAntiCheater,
+    BlackjackTrajectoryLengthAntiCheater,
 )
 
 from utils.classifiers import add_argument_classifier
@@ -28,19 +28,17 @@ class TesterModel(L.LightningModule):
     def __init__(self, hparams: argparse.Namespace):
         super().__init__()
         self.save_hyperparameters(hparams)
-        if self.hparams.cls_type == "heatmap":
-            self.model = ItemFarmAntiCheater(
-                grid_size=self.hparams.grid_size, features_dim=self.hparams.features_dim
-            )
+        if self.hparams.cls_type == "trajectory":
+            self.model = BlackjackAntiCheater(features_dim=self.hparams.features_dim)
         elif self.hparams.cls_type == "length":
-            self.model = ItemFarmTrajectoryLengthAntiCheater(
-                grid_size=self.hparams.grid_size
-            )
+            self.model = BlackjackTrajectoryLengthAntiCheater()
         elif self.hparams.cls_type == "reward":
-            self.model = ItemFarmRewardAntiCheater(grid_size=self.hparams.grid_size)
+            self.model = BlackjackRewardAntiCheater()
         self.criterion = nn.BCEWithLogitsLoss()
 
-    def load_checkpoint(self, checkpoint_path: str) -> None:
+    def load_checkpoint(
+        self, checkpoint_path: str, device: torch.device | str = "auto"
+    ) -> None:
         """Load model weight from the checkpoint
 
         Parameters
@@ -48,7 +46,7 @@ class TesterModel(L.LightningModule):
         checkpoint_path : str
             Path to checkpoint
         """
-        checkpoint = torch.load(checkpoint_path)
+        checkpoint = torch.load(checkpoint_path, map_location=device)
         if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
             checkpoint = checkpoint["state_dict"]
         self.model.load_state_dict(checkpoint, strict=False)
@@ -198,7 +196,7 @@ def main(args: argparse.Namespace) -> None:
     dm = TesterDataModule(args)
     model = TesterModel(args)
     if args.checkpoint:
-        model.load_checkpoint(args.checkpoint)
+        model.load_checkpoint(args.checkpoint, device="auto")
 
     # Trainer
     trainer = L.Trainer(

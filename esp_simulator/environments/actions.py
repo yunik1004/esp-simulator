@@ -8,3 +8,12 @@ class ItemFarmActions(IntEnum):
     left = 0
     right = 1
     forward = 2
+
+
+class BlackjackActions(IntEnum):
+    """Actions for Blackjack environment"""
+
+    hit = 0
+    stand = 1
+    double_down = 2
+    surrender = 3
