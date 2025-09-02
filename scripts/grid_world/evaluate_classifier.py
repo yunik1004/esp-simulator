@@ -207,7 +207,7 @@ def main(args: argparse.Namespace) -> None:
     # Trainer
     trainer = L.Trainer(
         accelerator=args.accelerator,
-        devices=fabric.device,
+        devices="auto",
         num_nodes=args.num_nodes,
         strategy=args.dist_strategy,
         logger=False,
