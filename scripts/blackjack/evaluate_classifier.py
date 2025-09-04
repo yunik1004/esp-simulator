@@ -1,6 +1,7 @@
 import argparse
 
 import lightning as L
+from lightning.fabric import Fabric
 from lightning.pytorch import seed_everything
 import torch
 from torch import nn
@@ -37,7 +38,7 @@ class TesterModel(L.LightningModule):
         self.criterion = nn.BCEWithLogitsLoss()
 
     def load_checkpoint(
-        self, checkpoint_path: str, device: torch.device | str = "auto"
+        self, checkpoint_path: str, device: torch.device
     ) -> None:
         """Load model weight from the checkpoint
 
@@ -192,11 +193,12 @@ def main(args: argparse.Namespace) -> None:
         Arguments
     """
     seed_everything(args.seed, workers=True)
+    fabric = Fabric(accelerator=args.accelerator, devices="auto", strategy="auto")
 
     dm = TesterDataModule(args)
     model = TesterModel(args)
     if args.checkpoint:
-        model.load_checkpoint(args.checkpoint, device="auto")
+        model.load_checkpoint(args.checkpoint, device=fabric.device)
 
     # Trainer
     trainer = L.Trainer(
