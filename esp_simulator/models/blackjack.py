@@ -99,7 +99,7 @@ class BlackjackAntiCheater(nn.Module):
             nn.Conv1d(n_input_channels, 3, 1),
             nn.ReLU(),
             nn.Conv1d(3, 2, 1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Flatten(),
         )
 

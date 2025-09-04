@@ -277,7 +277,7 @@ class BlackjackEnv(gym.Env):
         dict[str, np.ndarray]
             total
         """
-        status = np.concatenate([self.state, self.prev_action], axis=0)
+        status = np.concatenate([self.state, self.prev_action], axis=0, dtype=float)
         status[0] = status[0] / 10
         status[2] = status[2] / 4
         output = {

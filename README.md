@@ -64,7 +64,7 @@ python scripts/grid_world/gendata_classifier.py [--cheater | --mixed] \
 ### Train classifier
 
 ```bash
-python scripts/grid_world/train_classifier.py \
+python scripts/grid_world/train_classifier.py [--cls_type CLS_TYPE] \
         --dataset_normal_train ./output/train_noncheater.npy \
         --dataset_normal_val ./output/val_noncheater.npy \
         --dataset_esp_train ./output/train_cheater.npy \
@@ -74,7 +74,7 @@ python scripts/grid_world/train_classifier.py \
 ### Evaluate classifier
 
 ```bash
-python scripts/grid_world/evaluate_classifier.py \
+python scripts/grid_world/evaluate_classifier.py [--cls_type CLS_TYPE] \
         --checkpoint CHECKPOINT_PATH \
         --dataset_normal ./output/test_noncheater.npy \
         --dataset_esp ./output/test_cheater.npy
@@ -84,7 +84,7 @@ python scripts/grid_world/evaluate_classifier.py \
 
 ```bash
 # Remove `--train_classifier` if you don't want to train the detector.
-python scripts/grid_world/train_adversarial_agent.py --mixed \
+python scripts/grid_world/train_adversarial_agent.py --mixed  [--cls_type CLS_TYPE] \
         --checkpoint CHECKPOINT_CHEATER_PATH \
         --checkpoint_normal CHECKPOINT_NORMAL_PATH \
         --checkpoint_classifier CHECKPOINT_DETECTOR_PATH \
