@@ -37,9 +37,7 @@ class TesterModel(L.LightningModule):
             self.model = BlackjackRewardAntiCheater()
         self.criterion = nn.BCEWithLogitsLoss()
 
-    def load_checkpoint(
-        self, checkpoint_path: str, device: torch.device
-    ) -> None:
+    def load_checkpoint(self, checkpoint_path: str, device: torch.device) -> None:
         """Load model weight from the checkpoint
 
         Parameters

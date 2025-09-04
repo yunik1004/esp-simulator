@@ -278,6 +278,8 @@ class BlackjackEnv(gym.Env):
             total
         """
         status = np.concatenate([self.state, self.prev_action], axis=0)
+        status[0] = status[0] / 10
+        status[2] = status[2] / 4
         output = {
             "total": status,
         }
