@@ -1,6 +1,7 @@
 from collections import deque
 import hashlib
 import statistics
+from typing import List
 
 from gymnasium import spaces
 import numpy as np
