@@ -14,7 +14,18 @@ dependencies = [
     "minigrid>=3.0.0",
     "stable-baselines3>=2.5.0",
     "tensorboard>=2.19.0",
+    "torch==2.6.0",
+    "pytorch-triton-rocm==3.2.0; sys_platform == 'linux'",
 ]
 
 [tool.setuptools]
 packages = ["esp_simulator"]
+
+[[tool.uv.index]]
+name = "pytorch-rocm"
+url = "https://download.pytorch.org/whl/rocm6.2.4"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-rocm", marker = "sys_platform == 'linux'" }
+pytorch-triton-rocm = { index = "pytorch-rocm", marker = "sys_platform == 'linux'" }
